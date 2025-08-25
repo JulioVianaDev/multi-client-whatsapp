@@ -26,8 +26,9 @@ COPY . .
 # Update go.mod and build the application
 RUN go mod tidy && CGO_ENABLED=1 go build -o main .
 
-# Create directory for database
+# Create directories for database and media
 RUN mkdir -p /app/data && chmod 755 /app/data
+RUN mkdir -p /app/media && chmod 755 /app/media
 
 # Expose port
 EXPOSE 4444

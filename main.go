@@ -10,12 +10,16 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -134,6 +138,9 @@ func main() {
 
 	// Webhook endpoint for incoming messages
 	r.POST("/webhook", handleWebhook)
+
+	// Static file server for media files
+	r.Static("/media", "/app/media")
 
 	// Start server
 	go func() {
@@ -526,14 +533,254 @@ func getEventType(evt interface{}) string {
 	}
 }
 
+// ExtractedMedia represents extracted media information
+type ExtractedMedia struct {
+	MediaPath string `json:"media_path"`
+	MimeType  string `json:"mime_type"`
+	Caption   string `json:"caption"`
+	URL       string `json:"url"`
+}
+
+// downloadMedia downloads media from WhatsApp and saves it to the media volume
+func downloadMedia(ctx context.Context, client *whatsmeow.Client, mediaFile whatsmeow.DownloadableMessage, instanceKey string) (*ExtractedMedia, error) {
+	if mediaFile == nil {
+		return nil, fmt.Errorf("media file is nil")
+	}
+
+	// Download the media data
+	data, err := client.Download(ctx, mediaFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download media: %v", err)
+	}
+
+	// Create media directory if it doesn't exist
+	mediaDir := "/app/media"
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create media directory: %v", err)
+	}
+
+	// Create instance-specific directory
+	instanceDir := filepath.Join(mediaDir, instanceKey)
+	if err := os.MkdirAll(instanceDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create instance directory: %v", err)
+	}
+
+	// Create date-based directory
+	dateDir := filepath.Join(instanceDir, time.Now().Format("2006-01-02"))
+	if err := os.MkdirAll(dateDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create date directory: %v", err)
+	}
+
+	extractedMedia := &ExtractedMedia{}
+
+	// Determine mime type and caption based on media type
+	switch media := mediaFile.(type) {
+	case *waE2E.ImageMessage:
+		extractedMedia.MimeType = media.GetMimetype()
+		extractedMedia.Caption = media.GetCaption()
+	case *waE2E.AudioMessage:
+		extractedMedia.MimeType = media.GetMimetype()
+	case *waE2E.VideoMessage:
+		extractedMedia.MimeType = media.GetMimetype()
+		extractedMedia.Caption = media.GetCaption()
+	case *waE2E.StickerMessage:
+		extractedMedia.MimeType = media.GetMimetype()
+	case *waE2E.DocumentMessage:
+		extractedMedia.MimeType = media.GetMimetype()
+		extractedMedia.Caption = media.GetCaption()
+	}
+
+	// Determine file extension with better mapping
+	var extension string
+	switch extractedMedia.MimeType {
+	case "image/jpeg", "image/jpg":
+		extension = ".jpg"
+	case "image/png":
+		extension = ".png"
+	case "image/gif":
+		extension = ".gif"
+	case "image/webp":
+		extension = ".webp"
+	case "image/jfif":
+		extension = ".jpg" // Convert JFIF to JPG
+	case "video/mp4":
+		extension = ".mp4"
+	case "video/avi":
+		extension = ".avi"
+	case "video/mov":
+		extension = ".mov"
+	case "audio/mp3":
+		extension = ".mp3"
+	case "audio/ogg":
+		extension = ".ogg"
+	case "audio/wav":
+		extension = ".wav"
+	case "audio/m4a":
+		extension = ".m4a"
+	case "application/pdf":
+		extension = ".pdf"
+	case "application/msword":
+		extension = ".doc"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		extension = ".docx"
+	case "application/vnd.ms-excel":
+		extension = ".xls"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		extension = ".xlsx"
+	case "application/vnd.ms-powerpoint":
+		extension = ".ppt"
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		extension = ".pptx"
+	case "text/plain":
+		extension = ".txt"
+	default:
+		// Fallback to MIME type detection
+		if ext, err := mime.ExtensionsByType(extractedMedia.MimeType); err == nil && len(ext) > 0 {
+			extension = ext[0]
+		} else if parts := strings.Split(extractedMedia.MimeType, "/"); len(parts) > 1 {
+			extension = "." + parts[len(parts)-1]
+		} else {
+			extension = ".bin" // Default fallback
+		}
+	}
+
+	// Generate unique filename
+	filename := fmt.Sprintf("%d-%s%s", time.Now().Unix(), uuid.NewString(), extension)
+	filePath := filepath.Join(dateDir, filename)
+
+	// Write file to disk
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
+		return nil, fmt.Errorf("failed to write media file: %v", err)
+	}
+
+	extractedMedia.MediaPath = filePath
+	extractedMedia.URL = fmt.Sprintf("/media/%s/%s/%s", instanceKey, time.Now().Format("2006-01-02"), filename)
+
+	log.Printf("Media downloaded successfully: %s (MIME: %s, Extension: %s)", extractedMedia.URL, extractedMedia.MimeType, extension)
+
+	return extractedMedia, nil
+}
+
 // sendWebhook sends webhook data to Node.js with instance information
 func sendWebhook(eventType string, data interface{}, instanceKey string) {
+	// Check if this is a media message and download if needed
+	var enhancedData interface{}
+	
+	if msgEvent, ok := data.(*events.Message); ok {
+		// Create a copy of the event data to modify
+		enhancedData = data
+		
+		// Check for media and download if present
+		instanceManager.Mutex.RLock()
+		instance, exists := instanceManager.Instances[instanceKey]
+		instanceManager.Mutex.RUnlock()
+		
+		if exists && instance.Client != nil {
+			ctx := context.Background()
+			
+			// Check for different media types and download them
+			if img := msgEvent.Message.GetImageMessage(); img != nil {
+				if extractedMedia, err := downloadMedia(ctx, instance.Client, img, instanceKey); err == nil {
+					// Replace the image message with download info
+					enhancedData = map[string]interface{}{
+						"message_id": msgEvent.Info.ID,
+						"chat_id": msgEvent.Info.Chat.User,
+						"sender_id": msgEvent.Info.Sender.User,
+						"from": msgEvent.Info.SourceString(),
+						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						"push_name": msgEvent.Info.PushName,
+						"is_from_me": msgEvent.Info.IsFromMe,
+						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						"media_type": "image",
+						"media_url": extractedMedia.URL,
+						"media_path": extractedMedia.MediaPath,
+						"mime_type": extractedMedia.MimeType,
+						"caption": extractedMedia.Caption,
+					}
+				}
+			} else if vid := msgEvent.Message.GetVideoMessage(); vid != nil {
+				if extractedMedia, err := downloadMedia(ctx, instance.Client, vid, instanceKey); err == nil {
+					enhancedData = map[string]interface{}{
+						"message_id": msgEvent.Info.ID,
+						"chat_id": msgEvent.Info.Chat.User,
+						"sender_id": msgEvent.Info.Sender.User,
+						"from": msgEvent.Info.SourceString(),
+						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						"push_name": msgEvent.Info.PushName,
+						"is_from_me": msgEvent.Info.IsFromMe,
+						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						"media_type": "video",
+						"media_url": extractedMedia.URL,
+						"media_path": extractedMedia.MediaPath,
+						"mime_type": extractedMedia.MimeType,
+						"caption": extractedMedia.Caption,
+					}
+				}
+			} else if aud := msgEvent.Message.GetAudioMessage(); aud != nil {
+				if extractedMedia, err := downloadMedia(ctx, instance.Client, aud, instanceKey); err == nil {
+					enhancedData = map[string]interface{}{
+						"message_id": msgEvent.Info.ID,
+						"chat_id": msgEvent.Info.Chat.User,
+						"sender_id": msgEvent.Info.Sender.User,
+						"from": msgEvent.Info.SourceString(),
+						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						"push_name": msgEvent.Info.PushName,
+						"is_from_me": msgEvent.Info.IsFromMe,
+						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						"media_type": "audio",
+						"media_url": extractedMedia.URL,
+						"media_path": extractedMedia.MediaPath,
+						"mime_type": extractedMedia.MimeType,
+					}
+				}
+			} else if doc := msgEvent.Message.GetDocumentMessage(); doc != nil {
+				if extractedMedia, err := downloadMedia(ctx, instance.Client, doc, instanceKey); err == nil {
+					enhancedData = map[string]interface{}{
+						"message_id": msgEvent.Info.ID,
+						"chat_id": msgEvent.Info.Chat.User,
+						"sender_id": msgEvent.Info.Sender.User,
+						"from": msgEvent.Info.SourceString(),
+						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						"push_name": msgEvent.Info.PushName,
+						"is_from_me": msgEvent.Info.IsFromMe,
+						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						"media_type": "document",
+						"media_url": extractedMedia.URL,
+						"media_path": extractedMedia.MediaPath,
+						"mime_type": extractedMedia.MimeType,
+						"caption": extractedMedia.Caption,
+						"filename": doc.GetFileName(),
+					}
+				}
+			} else if stk := msgEvent.Message.GetStickerMessage(); stk != nil {
+				if extractedMedia, err := downloadMedia(ctx, instance.Client, stk, instanceKey); err == nil {
+					enhancedData = map[string]interface{}{
+						"message_id": msgEvent.Info.ID,
+						"chat_id": msgEvent.Info.Chat.User,
+						"sender_id": msgEvent.Info.Sender.User,
+						"from": msgEvent.Info.SourceString(),
+						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						"push_name": msgEvent.Info.PushName,
+						"is_from_me": msgEvent.Info.IsFromMe,
+						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						"media_type": "sticker",
+						"media_url": extractedMedia.URL,
+						"media_path": extractedMedia.MediaPath,
+						"mime_type": extractedMedia.MimeType,
+					}
+				}
+			}
+		}
+	} else {
+		enhancedData = data
+	}
+
 	payload := WebhookPayload{
 		Event:     eventType,
 		EventType: eventType,
 		Instance:  instanceKey,
 		Timestamp: time.Now(),
-		Data:      data, // Send raw event data without formatting
+		Data:      enhancedData,
 	}
 
 	jsonData, err := json.Marshal(payload)

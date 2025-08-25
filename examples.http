@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "da1114b59ee52df6ee091954498918f0"
+  "instance_key": "62e123dfa3b859c5d29cb803257c69e5"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/da1114b59ee52df6ee091954498918f0/qr
+GET http://localhost:4444/instance/62e123dfa3b859c5d29cb803257c69e5/qr
 
 ###
 
@@ -51,9 +51,9 @@ POST http://localhost:4444/message/send
 Content-Type: application/json
 
 {
-  "instance_key": "d16f13e303743ac61ec80821f4fc2c9e",
-  "phone": "5512981208485@s.whatsapp.net",
-  "message": "Hello from WhatsApp Bridge! 🚀",
+  "instance_key": "62e123dfa3b859c5d29cb803257c69e5",
+  "phone": "16174658484@s.whatsapp.net",
+  "message": "Hello from WhatsApp jean! 🚀",
   "reply_to": ""
 }
 

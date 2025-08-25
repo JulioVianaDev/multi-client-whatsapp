@@ -12,6 +12,8 @@ services:
     volumes:
       # Persist WhatsApp session data
       - whatsapp_data:/root/data
+      # Media storage - bind mount for easy access on host
+      - ./media:/app/media
     environment:
       - TZ=UTC
     restart: unless-stopped
