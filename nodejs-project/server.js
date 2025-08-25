@@ -329,6 +329,49 @@ app.post("/message/send-voice", async (req, res) => {
   }
 });
 
+app.post("/message/send-location", async (req, res) => {
+  try {
+    const { instance_key, phone, latitude, longitude, reply_to } = req.body;
+
+    if (!instance_key || !phone || latitude === undefined || longitude === undefined) {
+      return res.status(400).json({
+        error: "instance_key, phone, latitude, and longitude are required",
+      });
+    }
+
+    console.log(
+      chalk.blue(
+        `📍 Sending location (${latitude}, ${longitude}) to ${phone} via instance ${instance_key}`
+      )
+    );
+
+    const response = await axios.post(
+      "http://localhost:4444/message/send-location",
+      {
+        instance_key,
+        phone,
+        latitude,
+        longitude,
+        reply_to,
+      }
+    );
+
+    console.log(
+      chalk.green(
+        `✅ Location sent successfully: ${response.data.message_id}`
+      )
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.log(
+      chalk.red(
+        `❌ Failed to send location: ${error.message}`
+      )
+    );
+    res.status(500).json({ error: "Failed to send location" });
+  }
+});
+
 // Webhook endpoint for receiving messages from Go service
 app.post("/webhook", (req, res) => {
   const { event, instance, timestamp, data } = req.body;

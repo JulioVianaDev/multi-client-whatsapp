@@ -94,6 +94,15 @@ type VoiceMessageRequest struct {
 	ReplyTo     string `json:"reply_to,omitempty"`
 }
 
+// LocationMessageRequest represents a location message sending request
+type LocationMessageRequest struct {
+	InstanceKey string  `json:"instance_key" binding:"required"`
+	Phone       string  `json:"phone" binding:"required"`
+	Latitude    float64 `json:"latitude" binding:"required"`
+	Longitude   float64 `json:"longitude" binding:"required"`
+	ReplyTo     string  `json:"reply_to,omitempty"`
+}
+
 // ContactMessageRequest represents a contact message sending request
 type ContactMessageRequest struct {
 	InstanceKey string `json:"instance_key" binding:"required"`
@@ -155,6 +164,7 @@ func main() {
 	r.POST("/message/send-media", sendMediaMessage)
 	r.POST("/message/send-contact", sendContactMessage)
 	r.POST("/message/send-voice", sendVoiceMessage)
+	r.POST("/message/send-location", sendLocationMessage)
 
 	// Webhook endpoint for incoming messages
 	r.POST("/webhook", handleWebhook)
@@ -1259,6 +1269,66 @@ func sendVoiceMessage(c *gin.Context) {
 	// Add reply context if provided
 	if req.ReplyTo != "" {
 		msg.AudioMessage.ContextInfo = &waE2E.ContextInfo{
+			StanzaID: proto.String(req.ReplyTo),
+		}
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, MessageResponse{
+		Status:    "sent",
+		MessageID: resp.ID,
+	})
+}
+
+// sendLocationMessage sends a location message to a specific phone number
+func sendLocationMessage(c *gin.Context) {
+	var req LocationMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(req.Phone)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		return
+	}
+
+	// Create location message
+	msg := &waE2E.Message{
+		LocationMessage: &waE2E.LocationMessage{
+			DegreesLatitude:  proto.Float64(req.Latitude),
+			DegreesLongitude: proto.Float64(req.Longitude),
+		},
+	}
+
+	// Add reply context if provided
+	if req.ReplyTo != "" {
+		msg.LocationMessage.ContextInfo = &waE2E.ContextInfo{
 			StanzaID: proto.String(req.ReplyTo),
 		}
 	}

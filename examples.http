@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "2bf67527efcda4665c9b12c80b2c3bb4"
+  "instance_key": "378bf5331efb1f295922c9de2a9e3fba"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/2bf67527efcda4665c9b12c80b2c3bb4/qr
+GET http://localhost:4444/instance/378bf5331efb1f295922c9de2a9e3fba/qr
 
 ###
 
@@ -166,6 +166,19 @@ Content-Type: application/json
 
 ###
 
+### 16. Send location via Go service
+POST http://localhost:4444/message/send-location
+Content-Type: application/json
+
+{
+  "instance_key": "378bf5331efb1f295922c9de2a9e3fba",
+  "phone": "16174658484@s.whatsapp.net",
+  "latitude": -23.5505,
+  "longitude": -46.6333
+}
+
+###
+
 ### ========================================
 ### NODE.JS PROXY ENDPOINTS
 ### ========================================
@@ -262,11 +275,24 @@ Content-Type: application/json
 
 ###
 
+### 26. Send location via Node.js proxy
+POST http://localhost:5555/message/send-location
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "latitude": -23.5505,
+  "longitude": -46.6333
+}
+
+###
+
 ### ========================================
 ### WEBHOOK TESTING
 ### ========================================
 
-### 26. Test webhook functionality
+### 27. Test webhook functionality
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -283,7 +309,7 @@ Content-Type: application/json
 
 ###
 
-### 27. Test incoming message webhook
+### 28. Test incoming message webhook
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -300,7 +326,7 @@ Content-Type: application/json
 
 ###
 
-### 28. Test image message webhook
+### 29. Test image message webhook
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -321,23 +347,23 @@ Content-Type: application/json
 ### NODE.JS PROXY MANAGEMENT
 ### ========================================
 
-### 29. Get scan instructions from Node.js
+### 30. Get scan instructions from Node.js
 GET http://localhost:5555/scan
 
 ###
 
-### 30. List instances via Node.js proxy
+### 31. List instances via Node.js proxy
 GET http://localhost:5555/instances
 
 ###
 
-### 31. Create instance via Node.js proxy
+### 32. Create instance via Node.js proxy
 POST http://localhost:5555/instance/create
 Content-Type: application/json
 
 ###
 
-### 32. Connect instance via Node.js proxy
+### 33. Connect instance via Node.js proxy
 POST http://localhost:5555/instance/connect
 Content-Type: application/json
 
@@ -347,12 +373,12 @@ Content-Type: application/json
 
 ###
 
-### 33. Get QR code via Node.js proxy (replace {instanceKey})
+### 34. Get QR code via Node.js proxy (replace {instanceKey})
 GET http://localhost:5555/instance/abc123def456/qr
 
 ###
 
-### 34. Check status via Node.js proxy (replace {instanceKey})
+### 35. Check status via Node.js proxy (replace {instanceKey})
 GET http://localhost:5555/instance/abc123def456/status
 
 ###
@@ -361,7 +387,7 @@ GET http://localhost:5555/instance/abc123def456/status
 ### ERROR TESTING
 ### ========================================
 
-### 35. Test invalid instance key
+### 36. Test invalid instance key
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -373,7 +399,7 @@ Content-Type: application/json
 
 ###
 
-### 36. Test invalid phone number format
+### 37. Test invalid phone number format
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -385,7 +411,7 @@ Content-Type: application/json
 
 ###
 
-### 37. Test missing required fields
+### 38. Test missing required fields
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -395,7 +421,7 @@ Content-Type: application/json
 
 ###
 
-### 38. Test invalid media type
+### 39. Test invalid media type
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -408,7 +434,7 @@ Content-Type: application/json
 
 ###
 
-### 39. Test invalid media URL
+### 40. Test invalid media URL
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -425,7 +451,7 @@ Content-Type: application/json
 ### GROUP MESSAGES
 ### ========================================
 
-### 40. Send message to group (replace with actual group ID)
+### 41. Send message to group (replace with actual group ID)
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -437,7 +463,7 @@ Content-Type: application/json
 
 ###
 
-### 41. Send media to group
+### 42. Send media to group
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -455,7 +481,7 @@ Content-Type: application/json
 ### BULK MESSAGES (Multiple recipients)
 ### ========================================
 
-### 42. Send to multiple individual numbers
+### 43. Send to multiple individual numbers
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -467,7 +493,7 @@ Content-Type: application/json
 
 ###
 
-### 43. Send media to multiple recipients
+### 44. Send media to multiple recipients
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -485,7 +511,7 @@ Content-Type: application/json
 ### REPLY MESSAGES
 ### ========================================
 
-### 44. Reply to a specific message
+### 45. Reply to a specific message
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -498,7 +524,7 @@ Content-Type: application/json
 
 ###
 
-### 45. Reply with media
+### 46. Reply with media
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -517,12 +543,12 @@ Content-Type: application/json
 ### HEALTH CHECKS
 ### ========================================
 
-### 46. Check if Go service is running
+### 47. Check if Go service is running
 GET http://localhost:4444/instances
 
 ###
 
-### 47. Check if Node.js service is running
+### 48. Check if Node.js service is running
 GET http://localhost:5555/scan
 
 ###
@@ -546,7 +572,7 @@ GET http://localhost:5555/scan
 ### USING VARIABLES
 ### ========================================
 
-### 48. Send text using variables
+### 49. Send text using variables
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -558,7 +584,7 @@ Content-Type: application/json
 
 ###
 
-### 49. Send image using variables
+### 50. Send image using variables
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -572,7 +598,7 @@ Content-Type: application/json
 
 ###
 
-### 50. Send contact using variables
+### 51. Send contact using variables
 POST http://localhost:4444/message/send-contact
 Content-Type: application/json
 
@@ -585,7 +611,7 @@ Content-Type: application/json
 
 ###
 
-### 51. Send voice recording using variables
+### 52. Send voice recording using variables
 POST http://localhost:4444/message/send-voice
 Content-Type: application/json
 
@@ -593,6 +619,19 @@ Content-Type: application/json
   "instance_key": "{{instance_key}}",
   "phone": "{{phone_number}}",
   "url": "{{test_voice_url}}"
+}
+
+###
+
+### 53. Send location using variables
+POST http://localhost:4444/message/send-location
+Content-Type: application/json
+
+{
+  "instance_key": "{{instance_key}}",
+  "phone": "{{phone_number}}",
+  "latitude": -23.5505,
+  "longitude": -46.6333
 }
 
 ###

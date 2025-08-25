@@ -227,6 +227,33 @@ Sends a voice recording (PTT) message to a specific phone number.
 }
 ```
 
+### Send Location
+
+**POST** `/message/send-location`
+
+Sends a location message to a specific phone number.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "latitude": -23.5505,
+  "longitude": -46.6333,
+  "reply_to": "optional_message_id_to_reply_to"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "3EB0C767D82B3C2E"
+}
+```
+
 ## Node.js Webhook Receiver Endpoints
 
 ### Send Text Message (via Node.js)
@@ -295,6 +322,24 @@ Proxy endpoint that forwards voice recording requests to the Go service.
   "instance_key": "abc123def456",
   "phone": "1234567890@s.whatsapp.net",
   "url": "https://example.com/voice.ogg",
+  "reply_to": "optional_message_id_to_reply_to"
+}
+```
+
+### Send Location (via Node.js)
+
+**POST** `/message/send-location`
+
+Proxy endpoint that forwards location requests to the Go service.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "latitude": -23.5505,
+  "longitude": -46.6333,
   "reply_to": "optional_message_id_to_reply_to"
 }
 ```
@@ -425,7 +470,20 @@ curl -X POST http://localhost:4444/message/send-media \
   }'
 ```
 
-### 7. Send via Node.js Proxy
+### 7. Send Location
+
+```bash
+curl -X POST http://localhost:4444/message/send-location \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance_key": "abc123def456",
+    "phone": "1234567890@s.whatsapp.net",
+    "latitude": -23.5505,
+    "longitude": -46.6333
+  }'
+```
+
+### 8. Send via Node.js Proxy
 
 ```bash
 curl -X POST http://localhost:5555/message/send \
