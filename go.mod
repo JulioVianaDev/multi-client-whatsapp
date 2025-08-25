@@ -7,6 +7,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.31
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	go.mau.fi/whatsmeow v0.0.0-20250811141640-b804d10c54c2
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
@@ -41,6 +42,5 @@ require (
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -22,6 +22,7 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -45,6 +46,7 @@ type InstanceManager struct {
 // WebhookPayload represents the webhook data sent to Node.js
 type WebhookPayload struct {
 	Event     string      `json:"event"`
+	EventType string      `json:"event_type"`
 	Instance  string      `json:"instance"`
 	Timestamp time.Time   `json:"timestamp"`
 	Data      interface{} `json:"data"`
@@ -386,8 +388,9 @@ func disconnectInstance(c *gin.Context) {
 
 // handleInstanceEvents handles events for a specific instance
 func handleInstanceEvents(instanceKey string, evt interface{}) {
-	// Send event to Node.js with instance information
-	sendWebhook("event", evt, instanceKey)
+	// Determine event type and send appropriate webhook
+	eventType := getEventType(evt)
+	sendWebhook(eventType, evt, instanceKey)
 	
 	// Handle connection events - check for successful login
 	instanceManager.Mutex.RLock()
@@ -406,13 +409,131 @@ func handleInstanceEvents(instanceKey string, evt interface{}) {
 	}
 }
 
+// getEventType determines the type of event and returns a descriptive string
+func getEventType(evt interface{}) string {
+	switch e := evt.(type) {
+	case *events.Message:
+		// Check for protocol messages (revoke, edit, etc.)
+		if protocolMsg := e.Message.GetProtocolMessage(); protocolMsg != nil {
+			switch protocolMsg.GetType().String() {
+			case "REVOKE":
+				return "message_revoked"
+			case "MESSAGE_EDIT":
+				return "message_edited"
+			}
+		}
+		
+		// Check message content type
+		if e.Message.GetConversation() != "" || e.Message.GetExtendedTextMessage() != nil {
+			return "message_received"
+		}
+		if e.Message.GetImageMessage() != nil {
+			return "image_received"
+		}
+		if e.Message.GetVideoMessage() != nil {
+			return "video_received"
+		}
+		if e.Message.GetAudioMessage() != nil {
+			return "audio_received"
+		}
+		if e.Message.GetDocumentMessage() != nil {
+			return "document_received"
+		}
+		if e.Message.GetStickerMessage() != nil {
+			return "sticker_received"
+		}
+		if e.Message.GetContactMessage() != nil {
+			return "contact_received"
+		}
+		if e.Message.GetLocationMessage() != nil {
+			return "location_received"
+		}
+		if e.Message.GetLiveLocationMessage() != nil {
+			return "live_location_received"
+		}
+		if e.Message.GetListMessage() != nil {
+			return "list_received"
+		}
+		if e.Message.GetOrderMessage() != nil {
+			return "order_received"
+		}
+		return "message_received"
+		
+	case *events.Receipt:
+		switch e.Type {
+		case types.ReceiptTypeDelivered:
+			return "message_delivered"
+		case types.ReceiptTypeRead:
+			return "message_read"
+		case types.ReceiptTypeReadSelf:
+			return "message_read_self"
+		case types.ReceiptTypePlayed:
+			return "message_played"
+		case types.ReceiptTypePlayedSelf:
+			return "message_played_self"
+		case types.ReceiptTypeSender:
+			return "message_sender_receipt"
+		case types.ReceiptTypeRetry:
+			return "message_retry"
+		default:
+			return "message_receipt"
+		}
+		
+	case *events.DeleteForMe:
+		return "message_deleted"
+		
+	case *events.Presence:
+		return "presence_update"
+		
+	case *events.ChatPresence:
+		return "chat_presence_update"
+		
+	case *events.Connected:
+		return "connected"
+		
+	case *events.Disconnected:
+		return "disconnected"
+		
+	case *events.LoggedOut:
+		return "logged_out"
+		
+	case *events.PairSuccess:
+		return "pair_success"
+		
+	case *events.PushNameSetting:
+		return "push_name_setting"
+		
+	case *events.StreamReplaced:
+		return "stream_replaced"
+		
+	case *events.HistorySync:
+		return "history_sync"
+		
+	case *events.AppState:
+		return "app_state_update"
+		
+	case *events.AppStateSyncComplete:
+		return "app_state_sync_complete"
+		
+	case *events.GroupInfo:
+		return "group_info_update"
+		
+	case *events.PushName:
+		return "push_name_update"
+		
+	default:
+		return "unknown_event"
+	}
+}
+
 // sendWebhook sends webhook data to Node.js with instance information
 func sendWebhook(eventType string, data interface{}, instanceKey string) {
 	payload := WebhookPayload{
 		Event:     eventType,
+		EventType: eventType,
 		Instance:  instanceKey,
 		Timestamp: time.Now(),
-		Data:      data,
+		Data:      data, // Send raw event data without formatting
 	}
 
 	jsonData, err := json.Marshal(payload)
@@ -431,6 +552,8 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 
 	log.Printf("Webhook sent for instance %s: %s", instanceKey, eventType)
 }
+
+
 
 // sendTextMessage sends a text message to a specific phone number
 func sendTextMessage(c *gin.Context) {
