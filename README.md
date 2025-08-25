@@ -143,5 +143,6 @@ curl http://localhost:4444/media/{instance_key}/{date}/{filename}
 - `POST /message/send` - Send text message
 - `POST /message/send-media` - Send media message
 - `POST /message/send-contact` - Send contact message
+- `POST /message/send-voice` - Send voice recording (PTT)
 - `GET /media/*` - Access downloaded media files
 - `POST /webhook` - Receive webhooks from Node.js

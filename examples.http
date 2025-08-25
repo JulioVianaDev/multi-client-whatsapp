@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "538f8a945998ba4f797ded75df15edff"
+  "instance_key": "2bf67527efcda4665c9b12c80b2c3bb4"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/538f8a945998ba4f797ded75df15edff/qr
+GET http://localhost:4444/instance/2bf67527efcda4665c9b12c80b2c3bb4/qr
 
 ###
 
@@ -118,10 +118,50 @@ POST http://localhost:4444/message/send-contact
 Content-Type: application/json
 
 {
-  "instance_key": "538f8a945998ba4f797ded75df15edff",
+  "instance_key": "34f9808f029b2651764376cab09f8913",
   "phone": "16174658484@s.whatsapp.net",
   "contact_name": "Tomate",
   "contact_phone": "5512988053918@s.whatsapp.net"
+}
+
+###
+
+### 13. Send voice recording via Go service
+POST http://localhost:4444/message/send-voice
+Content-Type: application/json
+
+{
+  "instance_key": "2bf67527efcda4665c9b12c80b2c3bb4",
+  "phone": "16174658484@s.whatsapp.net",
+  "url": "https://base3.easychannel.online/assets/medias/attendances/9df40033-1a07-4a9b-9ab8-138d2daea67a.mp3"
+}
+
+###
+
+### 14. Send audio file (not voice recording) via Go service
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "2bf67527efcda4665c9b12c80b2c3bb4",
+  "phone": "16174658484@s.whatsapp.net",
+  "url": "https://base3.easychannel.online/assets/medias/attendances/9df40033-1a07-4a9b-9ab8-138d2daea67a.mp3",
+  "type": "audio",
+  "is_ptt": false
+}
+
+###
+
+### 15. Send voice recording as audio with PTT flag via Go service
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "34f9808f029b2651764376cab09f8913",
+  "phone": "16174658484@s.whatsapp.net",
+  "url": "https://example.com/voice.ogg",
+  "type": "audio",
+  "is_ptt": true
 }
 
 ###
@@ -130,7 +170,7 @@ Content-Type: application/json
 ### NODE.JS PROXY ENDPOINTS
 ### ========================================
 
-### 12. Send text message via Node.js proxy
+### 19. Send text message via Node.js proxy
 POST http://localhost:5555/message/send
 Content-Type: application/json
 
@@ -143,7 +183,7 @@ Content-Type: application/json
 
 ###
 
-### 13. Send image message via Node.js proxy
+### 20. Send image message via Node.js proxy
 POST http://localhost:5555/message/send-media
 Content-Type: application/json
 
@@ -157,7 +197,7 @@ Content-Type: application/json
 
 ###
 
-### 14. Send audio message via Node.js proxy
+### 21. Send audio message via Node.js proxy
 POST http://localhost:5555/message/send-media
 Content-Type: application/json
 
@@ -170,7 +210,7 @@ Content-Type: application/json
 
 ###
 
-### 15. Send video message via Node.js proxy
+### 22. Send video message via Node.js proxy
 POST http://localhost:5555/message/send-media
 Content-Type: application/json
 
@@ -184,7 +224,7 @@ Content-Type: application/json
 
 ###
 
-### 16. Send document/file via Node.js proxy
+### 23. Send document/file via Node.js proxy
 POST http://localhost:5555/message/send-media
 Content-Type: application/json
 
@@ -197,7 +237,7 @@ Content-Type: application/json
 
 ###
 
-### 17. Send contact via Node.js proxy
+### 24. Send contact via Node.js proxy
 POST http://localhost:5555/message/send-contact
 Content-Type: application/json
 
@@ -210,11 +250,23 @@ Content-Type: application/json
 
 ###
 
+### 25. Send voice recording via Node.js proxy
+POST http://localhost:5555/message/send-voice
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://example.com/voice.ogg"
+}
+
+###
+
 ### ========================================
 ### WEBHOOK TESTING
 ### ========================================
 
-### 18. Test webhook functionality
+### 26. Test webhook functionality
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -231,7 +283,7 @@ Content-Type: application/json
 
 ###
 
-### 19. Test incoming message webhook
+### 27. Test incoming message webhook
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -248,7 +300,7 @@ Content-Type: application/json
 
 ###
 
-### 20. Test image message webhook
+### 28. Test image message webhook
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -269,23 +321,23 @@ Content-Type: application/json
 ### NODE.JS PROXY MANAGEMENT
 ### ========================================
 
-### 21. Get scan instructions from Node.js
+### 29. Get scan instructions from Node.js
 GET http://localhost:5555/scan
 
 ###
 
-### 22. List instances via Node.js proxy
+### 30. List instances via Node.js proxy
 GET http://localhost:5555/instances
 
 ###
 
-### 23. Create instance via Node.js proxy
+### 31. Create instance via Node.js proxy
 POST http://localhost:5555/instance/create
 Content-Type: application/json
 
 ###
 
-### 24. Connect instance via Node.js proxy
+### 32. Connect instance via Node.js proxy
 POST http://localhost:5555/instance/connect
 Content-Type: application/json
 
@@ -295,12 +347,12 @@ Content-Type: application/json
 
 ###
 
-### 25. Get QR code via Node.js proxy (replace {instanceKey})
+### 33. Get QR code via Node.js proxy (replace {instanceKey})
 GET http://localhost:5555/instance/abc123def456/qr
 
 ###
 
-### 26. Check status via Node.js proxy (replace {instanceKey})
+### 34. Check status via Node.js proxy (replace {instanceKey})
 GET http://localhost:5555/instance/abc123def456/status
 
 ###
@@ -309,7 +361,7 @@ GET http://localhost:5555/instance/abc123def456/status
 ### ERROR TESTING
 ### ========================================
 
-### 27. Test invalid instance key
+### 35. Test invalid instance key
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -321,7 +373,7 @@ Content-Type: application/json
 
 ###
 
-### 28. Test invalid phone number format
+### 36. Test invalid phone number format
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -333,7 +385,7 @@ Content-Type: application/json
 
 ###
 
-### 29. Test missing required fields
+### 37. Test missing required fields
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -343,7 +395,7 @@ Content-Type: application/json
 
 ###
 
-### 30. Test invalid media type
+### 38. Test invalid media type
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -356,7 +408,7 @@ Content-Type: application/json
 
 ###
 
-### 31. Test invalid media URL
+### 39. Test invalid media URL
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -373,7 +425,7 @@ Content-Type: application/json
 ### GROUP MESSAGES
 ### ========================================
 
-### 32. Send message to group (replace with actual group ID)
+### 40. Send message to group (replace with actual group ID)
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -385,7 +437,7 @@ Content-Type: application/json
 
 ###
 
-### 33. Send media to group
+### 41. Send media to group
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -403,7 +455,7 @@ Content-Type: application/json
 ### BULK MESSAGES (Multiple recipients)
 ### ========================================
 
-### 34. Send to multiple individual numbers
+### 42. Send to multiple individual numbers
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -415,7 +467,7 @@ Content-Type: application/json
 
 ###
 
-### 35. Send media to multiple recipients
+### 43. Send media to multiple recipients
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -433,7 +485,7 @@ Content-Type: application/json
 ### REPLY MESSAGES
 ### ========================================
 
-### 36. Reply to a specific message
+### 44. Reply to a specific message
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -446,7 +498,7 @@ Content-Type: application/json
 
 ###
 
-### 37. Reply with media
+### 45. Reply with media
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -465,12 +517,12 @@ Content-Type: application/json
 ### HEALTH CHECKS
 ### ========================================
 
-### 38. Check if Go service is running
+### 46. Check if Go service is running
 GET http://localhost:4444/instances
 
 ###
 
-### 39. Check if Node.js service is running
+### 47. Check if Node.js service is running
 GET http://localhost:5555/scan
 
 ###
@@ -488,12 +540,13 @@ GET http://localhost:5555/scan
 @test_document = https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
 @test_contact_name = John Doe
 @test_contact_phone = 5551234567@s.whatsapp.net
+@test_voice_url = https://example.com/voice.ogg
 
 ### ========================================
 ### USING VARIABLES
 ### ========================================
 
-### 40. Send text using variables
+### 48. Send text using variables
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -505,7 +558,7 @@ Content-Type: application/json
 
 ###
 
-### 41. Send image using variables
+### 49. Send image using variables
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -519,7 +572,7 @@ Content-Type: application/json
 
 ###
 
-### 42. Send contact using variables
+### 50. Send contact using variables
 POST http://localhost:4444/message/send-contact
 Content-Type: application/json
 
@@ -528,6 +581,18 @@ Content-Type: application/json
   "phone": "{{phone_number}}",
   "contact_name": "{{test_contact_name}}",
   "contact_phone": "{{test_contact_phone}}"
+}
+
+###
+
+### 51. Send voice recording using variables
+POST http://localhost:4444/message/send-voice
+Content-Type: application/json
+
+{
+  "instance_key": "{{instance_key}}",
+  "phone": "{{phone_number}}",
+  "url": "{{test_voice_url}}"
 }
 
 ###

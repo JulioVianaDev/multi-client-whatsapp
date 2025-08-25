@@ -83,6 +83,15 @@ type MediaMessageRequest struct {
 	Caption     string `json:"caption,omitempty"`
 	URL         string `json:"url" binding:"required"`
 	Type        string `json:"type" binding:"required"` // "image", "audio", "video", "file"
+	IsPTT       bool   `json:"is_ptt,omitempty"`        // For audio: true = voice recording, false = audio file
+}
+
+// VoiceMessageRequest represents a voice recording message sending request
+type VoiceMessageRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+	URL         string `json:"url" binding:"required"`
+	ReplyTo     string `json:"reply_to,omitempty"`
 }
 
 // ContactMessageRequest represents a contact message sending request
@@ -145,6 +154,7 @@ func main() {
 	r.POST("/message/send", sendTextMessage)
 	r.POST("/message/send-media", sendMediaMessage)
 	r.POST("/message/send-contact", sendContactMessage)
+	r.POST("/message/send-voice", sendVoiceMessage)
 
 	// Webhook endpoint for incoming messages
 	r.POST("/webhook", handleWebhook)
@@ -992,14 +1002,22 @@ func sendMediaMessage(c *gin.Context) {
 			return
 		}
 
+		// Detect mimetype
+		mimeType := http.DetectContentType(mediaData)
+		
+		// Check if this is a PTT (voice recording) or regular audio file
+		isPTT := req.IsPTT
+		
 		msg = &waE2E.Message{
 			AudioMessage: &waE2E.AudioMessage{
 				URL:           proto.String(uploaded.URL),
 				DirectPath:    proto.String(uploaded.DirectPath),
+				Mimetype:      proto.String(mimeType),
 				MediaKey:      uploaded.MediaKey,
 				FileEncSHA256: uploaded.FileEncSHA256,
 				FileSHA256:    uploaded.FileSHA256,
 				FileLength:    proto.Uint64(uploaded.FileLength),
+				PTT:           proto.Bool(isPTT),
 			},
 		}
 
@@ -1130,6 +1148,117 @@ func sendContactMessage(c *gin.Context) {
 	// Add reply context if provided
 	if req.ReplyTo != "" {
 		msg.ContactMessage.ContextInfo = &waE2E.ContextInfo{
+			StanzaID: proto.String(req.ReplyTo),
+		}
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, MessageResponse{
+		Status:    "sent",
+		MessageID: resp.ID,
+	})
+}
+
+// sendVoiceMessage sends a voice recording (PTT) message to a specific phone number
+func sendVoiceMessage(c *gin.Context) {
+	var req VoiceMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(req.Phone)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		return
+	}
+
+	// Download audio from URL
+	httpResp, err := http.Get(req.URL)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to download audio from URL"})
+		return
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		c.JSON(500, gin.H{"error": fmt.Sprintf("Failed to download audio: %d", httpResp.StatusCode)})
+		return
+	}
+
+	mediaData, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to read audio data"})
+		return
+	}
+
+	// Create media directory if it doesn't exist
+	mediaDir := "./media"
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to create media directory"})
+		return
+	}
+
+	// Generate unique filename
+	filename := fmt.Sprintf("voice_%d", time.Now().Unix())
+	filepath := fmt.Sprintf("%s/%s.ogg", mediaDir, filename)
+	if err := os.WriteFile(filepath, mediaData, 0644); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to save voice recording"})
+		return
+	}
+	defer os.Remove(filepath) // Clean up after sending
+
+	// Upload voice recording to WhatsApp
+	uploaded, err := instance.Client.Upload(context.Background(), mediaData, whatsmeow.MediaAudio)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to upload voice recording"})
+		return
+	}
+
+	// Detect mimetype
+	mimeType := http.DetectContentType(mediaData)
+	
+	// Create voice message (PTT = true for voice recordings)
+	msg := &waE2E.Message{
+		AudioMessage: &waE2E.AudioMessage{
+			URL:           proto.String(uploaded.URL),
+			DirectPath:    proto.String(uploaded.DirectPath),
+			Mimetype:      proto.String(mimeType),
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    proto.Uint64(uploaded.FileLength),
+			PTT:           proto.Bool(true), // Always true for voice recordings
+		},
+	}
+
+	// Add reply context if provided
+	if req.ReplyTo != "" {
+		msg.AudioMessage.ContextInfo = &waE2E.ContextInfo{
 			StanzaID: proto.String(req.ReplyTo),
 		}
 	}

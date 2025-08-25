@@ -248,11 +248,13 @@ app.post("/message/send-media", async (req, res) => {
 
 app.post("/message/send-contact", async (req, res) => {
   try {
-    const { instance_key, phone, contact_name, contact_phone, reply_to } = req.body;
+    const { instance_key, phone, contact_name, contact_phone, reply_to } =
+      req.body;
 
     if (!instance_key || !phone || !contact_name || !contact_phone) {
       return res.status(400).json({
-        error: "instance_key, phone, contact_name, and contact_phone are required",
+        error:
+          "instance_key, phone, contact_name, and contact_phone are required",
       });
     }
 
@@ -281,11 +283,49 @@ app.post("/message/send-contact", async (req, res) => {
     res.json(response.data);
   } catch (error) {
     console.log(
-      chalk.red(
-        `❌ Failed to send contact message: ${error.message}`
-      )
+      chalk.red(`❌ Failed to send contact message: ${error.message}`)
     );
     res.status(500).json({ error: "Failed to send contact message" });
+  }
+});
+
+app.post("/message/send-voice", async (req, res) => {
+  try {
+    const { instance_key, phone, url, reply_to } = req.body;
+
+    if (!instance_key || !phone || !url) {
+      return res.status(400).json({
+        error: "instance_key, phone, and url are required",
+      });
+    }
+
+    console.log(
+      chalk.blue(
+        `🎤 Sending voice recording to ${phone} via instance ${instance_key}`
+      )
+    );
+
+    const response = await axios.post(
+      "http://localhost:4444/message/send-voice",
+      {
+        instance_key,
+        phone,
+        url,
+        reply_to,
+      }
+    );
+
+    console.log(
+      chalk.green(
+        `✅ Voice recording sent successfully: ${response.data.message_id}`
+      )
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.log(
+      chalk.red(`❌ Failed to send voice recording: ${error.message}`)
+    );
+    res.status(500).json({ error: "Failed to send voice recording" });
   }
 });
 

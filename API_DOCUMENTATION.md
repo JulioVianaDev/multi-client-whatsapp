@@ -161,7 +161,7 @@ Sends a media message (image, audio, video, file) to a specific phone number.
 **Media Types:**
 
 - `image` - Images (JPG, PNG, etc.)
-- `audio` - Audio files (MP3, WAV, etc.)
+- `audio` - Audio files (MP3, WAV, etc.) - Use `is_ptt: true` for voice recordings
 - `video` - Video files (MP4, AVI, etc.)
 - `file` - Documents (PDF, DOC, etc.)
 
@@ -188,6 +188,32 @@ Sends a contact message to a specific phone number.
   "phone": "1234567890@s.whatsapp.net",
   "contact_name": "John Doe",
   "contact_phone": "9876543210@s.whatsapp.net",
+  "reply_to": "optional_message_id_to_reply_to"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "3EB0C767D82B3C2E"
+}
+```
+
+### Send Voice Recording
+
+**POST** `/message/send-voice`
+
+Sends a voice recording (PTT) message to a specific phone number.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://example.com/voice.ogg",
   "reply_to": "optional_message_id_to_reply_to"
 }
 ```
@@ -252,6 +278,23 @@ Proxy endpoint that forwards contact message requests to the Go service.
   "phone": "1234567890@s.whatsapp.net",
   "contact_name": "John Doe",
   "contact_phone": "9876543210@s.whatsapp.net",
+  "reply_to": "optional_message_id_to_reply_to"
+}
+```
+
+### Send Voice Recording (via Node.js)
+
+**POST** `/message/send-voice`
+
+Proxy endpoint that forwards voice recording requests to the Go service.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://example.com/voice.ogg",
   "reply_to": "optional_message_id_to_reply_to"
 }
 ```
@@ -356,7 +399,33 @@ curl -X POST http://localhost:4444/message/send-contact \
   }'
 ```
 
-### 5. Send via Node.js Proxy
+### 5. Send a Voice Recording
+
+```bash
+curl -X POST http://localhost:4444/message/send-voice \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance_key": "abc123def456",
+    "phone": "1234567890@s.whatsapp.net",
+    "url": "https://example.com/voice.ogg"
+  }'
+```
+
+### 6. Send Audio File (not voice recording)
+
+```bash
+curl -X POST http://localhost:4444/message/send-media \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance_key": "abc123def456",
+    "phone": "1234567890@s.whatsapp.net",
+    "url": "https://example.com/music.mp3",
+    "type": "audio",
+    "is_ptt": false
+  }'
+```
+
+### 7. Send via Node.js Proxy
 
 ```bash
 curl -X POST http://localhost:5555/message/send \
