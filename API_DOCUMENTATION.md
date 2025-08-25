@@ -174,6 +174,33 @@ Sends a media message (image, audio, video, file) to a specific phone number.
 }
 ```
 
+### Send Contact Message
+
+**POST** `/message/send-contact`
+
+Sends a contact message to a specific phone number.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "contact_name": "John Doe",
+  "contact_phone": "9876543210@s.whatsapp.net",
+  "reply_to": "optional_message_id_to_reply_to"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "3EB0C767D82B3C2E"
+}
+```
+
 ## Node.js Webhook Receiver Endpoints
 
 ### Send Text Message (via Node.js)
@@ -208,6 +235,24 @@ Proxy endpoint that forwards media message requests to the Go service.
   "url": "https://example.com/image.jpg",
   "type": "image",
   "caption": "Optional caption for the media"
+}
+```
+
+### Send Contact Message (via Node.js)
+
+**POST** `/message/send-contact`
+
+Proxy endpoint that forwards contact message requests to the Go service.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "contact_name": "John Doe",
+  "contact_phone": "9876543210@s.whatsapp.net",
+  "reply_to": "optional_message_id_to_reply_to"
 }
 ```
 
@@ -298,7 +343,20 @@ curl -X POST http://localhost:4444/message/send-media \
   }'
 ```
 
-### 4. Send via Node.js Proxy
+### 4. Send a Contact
+
+```bash
+curl -X POST http://localhost:4444/message/send-contact \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance_key": "abc123def456",
+    "phone": "1234567890@s.whatsapp.net",
+    "contact_name": "John Doe",
+    "contact_phone": "9876543210@s.whatsapp.net"
+  }'
+```
+
+### 5. Send via Node.js Proxy
 
 ```bash
 curl -X POST http://localhost:5555/message/send \

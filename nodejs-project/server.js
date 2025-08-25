@@ -246,6 +246,49 @@ app.post("/message/send-media", async (req, res) => {
   }
 });
 
+app.post("/message/send-contact", async (req, res) => {
+  try {
+    const { instance_key, phone, contact_name, contact_phone, reply_to } = req.body;
+
+    if (!instance_key || !phone || !contact_name || !contact_phone) {
+      return res.status(400).json({
+        error: "instance_key, phone, contact_name, and contact_phone are required",
+      });
+    }
+
+    console.log(
+      chalk.blue(
+        `👤 Sending contact message to ${phone} via instance ${instance_key}`
+      )
+    );
+
+    const response = await axios.post(
+      "http://localhost:4444/message/send-contact",
+      {
+        instance_key,
+        phone,
+        contact_name,
+        contact_phone,
+        reply_to,
+      }
+    );
+
+    console.log(
+      chalk.green(
+        `✅ Contact message sent successfully: ${response.data.message_id}`
+      )
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.log(
+      chalk.red(
+        `❌ Failed to send contact message: ${error.message}`
+      )
+    );
+    res.status(500).json({ error: "Failed to send contact message" });
+  }
+});
+
 // Webhook endpoint for receiving messages from Go service
 app.post("/webhook", (req, res) => {
   const { event, instance, timestamp, data } = req.body;

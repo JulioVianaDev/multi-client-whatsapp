@@ -85,6 +85,15 @@ type MediaMessageRequest struct {
 	Type        string `json:"type" binding:"required"` // "image", "audio", "video", "file"
 }
 
+// ContactMessageRequest represents a contact message sending request
+type ContactMessageRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+	ContactName string `json:"contact_name" binding:"required"`
+	ContactPhone string `json:"contact_phone" binding:"required"`
+	ReplyTo     string `json:"reply_to,omitempty"`
+}
+
 // MessageResponse represents the response from message sending
 type MessageResponse struct {
 	Status    string `json:"status"`
@@ -135,6 +144,7 @@ func main() {
 	// Message sending endpoints
 	r.POST("/message/send", sendTextMessage)
 	r.POST("/message/send-media", sendMediaMessage)
+	r.POST("/message/send-contact", sendContactMessage)
 
 	// Webhook endpoint for incoming messages
 	r.POST("/webhook", handleWebhook)
@@ -1050,6 +1060,78 @@ func sendMediaMessage(c *gin.Context) {
 	default:
 		c.JSON(400, gin.H{"error": "Invalid media type"})
 		return
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, MessageResponse{
+		Status:    "sent",
+		MessageID: resp.ID,
+	})
+}
+
+// sendContactMessage sends a contact message to a specific phone number
+func sendContactMessage(c *gin.Context) {
+	var req ContactMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(req.Phone)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		return
+	}
+
+	// Parse contact phone number to extract the number without @s.whatsapp.net
+	contactPhoneNumber := req.ContactPhone
+	if strings.Contains(contactPhoneNumber, "@s.whatsapp.net") {
+		contactPhoneNumber = strings.Split(contactPhoneNumber, "@")[0]
+	}
+
+	// Create contact message with proper vCard format
+	vcard := fmt.Sprintf("BEGIN:VCARD\nVERSION:3.0\nN:;%s;;;\nFN:%s\nTEL;type=CELL;type=VOICE;waid=%s:+%s\nEND:VCARD",
+		req.ContactName,
+		req.ContactName,
+		contactPhoneNumber,
+		contactPhoneNumber)
+
+	msg := &waE2E.Message{
+		ContactMessage: &waE2E.ContactMessage{
+			DisplayName: proto.String(req.ContactName),
+			Vcard:       proto.String(vcard),
+		},
+	}
+
+	// Add reply context if provided
+	if req.ReplyTo != "" {
+		msg.ContactMessage.ContextInfo = &waE2E.ContextInfo{
+			StanzaID: proto.String(req.ReplyTo),
+		}
 	}
 
 	// Send message

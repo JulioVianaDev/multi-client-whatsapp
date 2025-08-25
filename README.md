@@ -142,5 +142,6 @@ curl http://localhost:4444/media/{instance_key}/{date}/{filename}
 - `GET /instance/{instanceKey}/qr` - Get QR code for connection
 - `POST /message/send` - Send text message
 - `POST /message/send-media` - Send media message
+- `POST /message/send-contact` - Send contact message
 - `GET /media/*` - Access downloaded media files
 - `POST /webhook` - Receive webhooks from Node.js
