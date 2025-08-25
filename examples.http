@@ -1,0 +1,525 @@
+### WhatsApp Bridge API Examples
+### This file contains examples for all API endpoints
+
+### ========================================
+### INSTANCE MANAGEMENT
+### ========================================
+
+### 1. Create a new WhatsApp instance
+POST http://localhost:4444/instance/create
+Content-Type: application/json
+
+###
+
+### 2. Connect an instance (replace {instance_key} with actual key)
+POST http://localhost:4444/instance/connect
+Content-Type: application/json
+
+{
+  "instance_key": "d16f13e303743ac61ec80821f4fc2c9e"
+}
+
+###
+
+### 3. Get QR code for an instance (replace {instance_key})
+GET http://localhost:4444/instance/d16f13e303743ac61ec80821f4fc2c9e/qr
+
+###
+
+### 4. Check instance status (replace {instance_key})
+GET http://localhost:4444/instance/d16f13e303743ac61ec80821f4fc2c9e/status
+
+###
+
+### 5. List all instances
+GET http://localhost:4444/instances
+
+###
+
+### 6. Disconnect an instance (replace {instance_key})
+POST http://localhost:4444/instance/abc123def456/disconnect
+Content-Type: application/json
+
+###
+
+### ========================================
+### MESSAGE SENDING (Go Service)
+### ========================================
+
+### 7. Send text message via Go service
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "d16f13e303743ac61ec80821f4fc2c9e",
+  "phone": "5512981208485@s.whatsapp.net",
+  "message": "Hello from WhatsApp Bridge! 🚀",
+  "reply_to": ""
+}
+
+###
+
+### 8. Send image message via Go service
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://picsum.photos/400/300",
+  "type": "image",
+  "caption": "Check out this beautiful image! 📸"
+}
+
+###
+
+### 9. Send audio message via Go service
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
+  "type": "audio"
+}
+
+###
+
+### 10. Send video message via Go service
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
+  "type": "video",
+  "caption": "Check out this video! 🎥"
+}
+
+###
+
+### 11. Send document/file via Go service
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  "type": "file"
+}
+
+###
+
+### ========================================
+### NODE.JS PROXY ENDPOINTS
+### ========================================
+
+### 12. Send text message via Node.js proxy
+POST http://localhost:5555/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "message": "Hello from Node.js proxy! 🔄",
+  "reply_to": "optional_message_id_to_reply_to"
+}
+
+###
+
+### 13. Send image message via Node.js proxy
+POST http://localhost:5555/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://picsum.photos/400/300",
+  "type": "image",
+  "caption": "Image sent via Node.js proxy! 📸"
+}
+
+###
+
+### 14. Send audio message via Node.js proxy
+POST http://localhost:5555/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
+  "type": "audio"
+}
+
+###
+
+### 15. Send video message via Node.js proxy
+POST http://localhost:5555/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
+  "type": "video",
+  "caption": "Video sent via Node.js proxy! 🎥"
+}
+
+###
+
+### 16. Send document/file via Node.js proxy
+POST http://localhost:5555/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  "type": "file"
+}
+
+###
+
+### ========================================
+### WEBHOOK TESTING
+### ========================================
+
+### 17. Test webhook functionality
+POST http://localhost:5555/webhook
+Content-Type: application/json
+
+{
+  "event": "test_message",
+  "instance": "abc123def456",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "data": {
+    "from": "1234567890@s.whatsapp.net",
+    "message": "Test webhook message",
+    "type": "text"
+  }
+}
+
+###
+
+### 18. Test incoming message webhook
+POST http://localhost:5555/webhook
+Content-Type: application/json
+
+{
+  "event": "message",
+  "instance": "abc123def456",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "data": {
+    "from": "1234567890@s.whatsapp.net",
+    "message": "hello",
+    "type": "text"
+  }
+}
+
+###
+
+### 19. Test image message webhook
+POST http://localhost:5555/webhook
+Content-Type: application/json
+
+{
+  "event": "message",
+  "instance": "abc123def456",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "data": {
+    "from": "1234567890@s.whatsapp.net",
+    "message": "https://example.com/image.jpg",
+    "type": "image"
+  }
+}
+
+###
+
+### ========================================
+### NODE.JS PROXY MANAGEMENT
+### ========================================
+
+### 20. Get scan instructions from Node.js
+GET http://localhost:5555/scan
+
+###
+
+### 21. List instances via Node.js proxy
+GET http://localhost:5555/instances
+
+###
+
+### 22. Create instance via Node.js proxy
+POST http://localhost:5555/instance/create
+Content-Type: application/json
+
+###
+
+### 23. Connect instance via Node.js proxy
+POST http://localhost:5555/instance/connect
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456"
+}
+
+###
+
+### 24. Get QR code via Node.js proxy (replace {instanceKey})
+GET http://localhost:5555/instance/abc123def456/qr
+
+###
+
+### 25. Check status via Node.js proxy (replace {instanceKey})
+GET http://localhost:5555/instance/abc123def456/status
+
+###
+
+### ========================================
+### ERROR TESTING
+### ========================================
+
+### 26. Test invalid instance key
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "invalid_key",
+  "phone": "1234567890@s.whatsapp.net",
+  "message": "This should fail"
+}
+
+###
+
+### 27. Test invalid phone number format
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890",
+  "message": "This should fail due to invalid phone format"
+}
+
+###
+
+### 28. Test missing required fields
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456"
+}
+
+###
+
+### 29. Test invalid media type
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://example.com/file.txt",
+  "type": "invalid_type"
+}
+
+###
+
+### 30. Test invalid media URL
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://invalid-url-that-does-not-exist.com/image.jpg",
+  "type": "image"
+}
+
+###
+
+### ========================================
+### GROUP MESSAGES
+### ========================================
+
+### 31. Send message to group (replace with actual group ID)
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890-1234567890@g.us",
+  "message": "Hello group! 👥"
+}
+
+###
+
+### 32. Send media to group
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890-1234567890@g.us",
+  "url": "https://picsum.photos/400/300",
+  "type": "image",
+  "caption": "Group image! 📸"
+}
+
+###
+
+### ========================================
+### BULK MESSAGES (Multiple recipients)
+### ========================================
+
+### 33. Send to multiple individual numbers
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "message": "Bulk message test"
+}
+
+###
+
+### 34. Send media to multiple recipients
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://picsum.photos/400/300",
+  "type": "image",
+  "caption": "Bulk media message"
+}
+
+###
+
+### ========================================
+### REPLY MESSAGES
+### ========================================
+
+### 35. Reply to a specific message
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "message": "This is a reply to your message",
+  "reply_to": "3EB0C767D82B3C2E"
+}
+
+###
+
+### 36. Reply with media
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "url": "https://picsum.photos/400/300",
+  "type": "image",
+  "caption": "Reply with image",
+  "reply_to": "3EB0C767D82B3C2E"
+}
+
+###
+
+### ========================================
+### HEALTH CHECKS
+### ========================================
+
+### 37. Check if Go service is running
+GET http://localhost:4444/instances
+
+###
+
+### 38. Check if Node.js service is running
+GET http://localhost:5555/scan
+
+###
+
+### ========================================
+### VARIABLES FOR TESTING
+### ========================================
+
+@instance_key = abc123def456
+@phone_number = 1234567890@s.whatsapp.net
+@group_id = 1234567890-1234567890@g.us
+@test_image = https://picsum.photos/400/300
+@test_audio = https://www.soundjay.com/misc/sounds/bell-ringing-05.wav
+@test_video = https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4
+@test_document = https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
+
+### ========================================
+### USING VARIABLES
+### ========================================
+
+### 39. Send text using variables
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "{{instance_key}}",
+  "phone": "{{phone_number}}",
+  "message": "Message using variables! 🎯"
+}
+
+###
+
+### 40. Send image using variables
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "{{instance_key}}",
+  "phone": "{{phone_number}}",
+  "url": "{{test_image}}",
+  "type": "image",
+  "caption": "Image using variables! 📸"
+}
+
+###
+
+### ========================================
+### NOTES AND TIPS
+### ========================================
+
+### IMPORTANT NOTES:
+### 1. Replace "abc123def456" with actual instance keys from your system
+### 2. Replace "1234567890@s.whatsapp.net" with actual phone numbers
+### 3. Phone numbers must include @s.whatsapp.net suffix
+### 4. Group IDs must include @g.us suffix
+### 5. Media URLs must be publicly accessible
+### 6. Instance must be connected before sending messages
+### 7. QR code must be scanned before instance is usable
+
+### SUPPORTED MEDIA TYPES:
+### - image: JPG, PNG, GIF, etc.
+### - audio: MP3, WAV, OGG, etc.
+### - video: MP4, AVI, MOV, etc.
+### - file: PDF, DOC, TXT, etc.
+
+### ERROR CODES:
+### - 400: Bad Request (invalid parameters)
+### - 404: Instance not found
+### - 500: Internal server error
+
+### TESTING WORKFLOW:
+### 1. Create instance (example 1)
+### 2. Connect instance (example 2)
+### 3. Get QR code (example 3)
+### 4. Scan QR code with WhatsApp mobile app
+### 5. Check status (example 4)
+### 6. Send messages (examples 7-16)
+### 7. Test webhooks (examples 17-19)

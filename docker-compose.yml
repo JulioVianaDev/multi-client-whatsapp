@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  # Go WhatsApp Bridge
+  whatsapp-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-bridge
+    ports:
+      - "4444:4444"
+    volumes:
+      # Persist WhatsApp session data
+      - whatsapp_data:/root/data
+    environment:
+      - TZ=UTC
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD",
+    #       "wget",
+    #       "--no-verbose",
+    #       "--tries=1",
+    #       "--spider",
+    #       "http://localhost:4444/status",
+    #     ]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+  # Node.js Webhook Receiver
+  webhook-receiver:
+    build:
+      context: ./nodejs-project
+      dockerfile: Dockerfile
+    container_name: webhook-receiver
+    ports:
+      - "5555:5555"
+    environment:
+      - NODE_ENV=production
+      - TZ=UTC
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    depends_on:
+      - whatsapp-bridge
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD",
+    #       "wget",
+    #       "--no-verbose",
+    #       "--tries=1",
+    #       "--spider",
+    #       "http://localhost:5555/health",
+    #     ]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 30s
+
+volumes:
+  whatsapp_data:
+    driver: local
+
+networks:
+  whatsapp-network:
+    driver: bridge

@@ -1,0 +1,789 @@
+package main
+
+import (
+	_ "github.com/mattn/go-sqlite3"
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/skip2/go-qrcode"
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store/sqlstore"
+	waLog "go.mau.fi/whatsmeow/util/log"
+	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/types"
+	"google.golang.org/protobuf/proto"
+)
+
+// Instance represents a WhatsApp client instance
+type Instance struct {
+	ID           string
+	Client       *whatsmeow.Client
+	PhoneNumber  string
+	IsConnected  bool
+	QRCodeChan   chan string
+	Container    *sqlstore.Container
+	Mutex        sync.RWMutex
+}
+
+// InstanceManager manages all WhatsApp instances
+type InstanceManager struct {
+	Instances map[string]*Instance
+	Mutex     sync.RWMutex
+}
+
+// WebhookPayload represents the webhook data sent to Node.js
+type WebhookPayload struct {
+	Event     string      `json:"event"`
+	Instance  string      `json:"instance"`
+	Timestamp time.Time   `json:"timestamp"`
+	Data      interface{} `json:"data"`
+}
+
+// ConnectRequest represents the request to connect a new instance
+type ConnectRequest struct {
+	InstanceKey string `json:"instance_key"`
+}
+
+// ConnectResponse represents the response from connect endpoint
+type ConnectResponse struct {
+	Status      string `json:"status"`
+	InstanceKey string `json:"instance_key"`
+	Message     string `json:"message,omitempty"`
+}
+
+// MessageRequest represents a message sending request
+type MessageRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+	Message     string `json:"message" binding:"required"`
+	ReplyTo     string `json:"reply_to,omitempty"`
+}
+
+// MediaMessageRequest represents a media message sending request
+type MediaMessageRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+	Caption     string `json:"caption,omitempty"`
+	URL         string `json:"url" binding:"required"`
+	Type        string `json:"type" binding:"required"` // "image", "audio", "video", "file"
+}
+
+// MessageResponse represents the response from message sending
+type MessageResponse struct {
+	Status    string `json:"status"`
+	MessageID string `json:"message_id,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// IncomingMessage represents an incoming WhatsApp message
+type IncomingMessage struct {
+	InstanceKey string    `json:"instance_key"`
+	From        string    `json:"from"`
+	To          string    `json:"to"`
+	Message     string    `json:"message"`
+	MessageType string    `json:"message_type"`
+	Timestamp   time.Time `json:"timestamp"`
+	MessageID   string    `json:"message_id"`
+}
+
+var instanceManager *InstanceManager
+
+func main() {
+	// Initialize instance manager
+	instanceManager = &InstanceManager{
+		Instances: make(map[string]*Instance),
+	}
+
+	// Setup Gin router
+	r := gin.Default()
+
+	// Create new instance endpoint
+	r.POST("/instance/create", createInstance)
+
+	// Connect instance endpoint
+	r.POST("/instance/connect", connectInstance)
+
+	// QR code endpoint
+	r.GET("/instance/:instanceKey/qr", getQRCode)
+
+	// Status endpoint for specific instance
+	r.GET("/instance/:instanceKey/status", getInstanceStatus)
+
+	// List all instances endpoint
+	r.GET("/instances", listInstances)
+
+	// Disconnect instance endpoint
+	r.POST("/instance/:instanceKey/disconnect", disconnectInstance)
+
+	// Message sending endpoints
+	r.POST("/message/send", sendTextMessage)
+	r.POST("/message/send-media", sendMediaMessage)
+
+	// Webhook endpoint for incoming messages
+	r.POST("/webhook", handleWebhook)
+
+	// Start server
+	go func() {
+		log.Println("Starting Multi-Instance Go WhatsApp Bridge on port 4444")
+		r.Run(":4444")
+	}()
+
+	// Keep the main function running
+	select {}
+}
+
+// generateInstanceKey generates a unique instance key
+func generateInstanceKey() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
+// createInstance creates a new WhatsApp instance
+func createInstance(c *gin.Context) {
+	instanceKey := generateInstanceKey()
+
+	// Setup database for this instance
+	dbLog := waLog.Stdout(fmt.Sprintf("Database-%s", instanceKey), "DEBUG", true)
+	dbPath := fmt.Sprintf("./whatsapp_%s.db?_foreign_keys=on", instanceKey)
+	
+	container, err := sqlstore.New(context.Background(), "sqlite3", dbPath, dbLog)
+	if err != nil {
+		log.Printf("Error creating database container for instance %s: %v", instanceKey, err)
+		c.JSON(500, gin.H{"error": "Failed to create database"})
+		return
+	}
+
+	deviceStore, err := container.GetFirstDevice(context.Background())
+	if err != nil {
+		log.Printf("Error getting device store for instance %s: %v", instanceKey, err)
+		c.JSON(500, gin.H{"error": "Failed to get device store"})
+		return
+	}
+
+	// Create client
+	client := whatsmeow.NewClient(deviceStore, waLog.Stdout(fmt.Sprintf("Client-%s", instanceKey), "DEBUG", true))
+	
+	// Create instance
+	instance := &Instance{
+		ID:          instanceKey,
+		Client:      client,
+		PhoneNumber: "",
+		IsConnected: false,
+		QRCodeChan:  make(chan string, 1),
+		Container:   container,
+	}
+
+	// Add event handler
+	client.AddEventHandler(func(evt interface{}) {
+		handleInstanceEvents(instanceKey, evt)
+	})
+
+	// Add to instance manager
+	instanceManager.Mutex.Lock()
+	instanceManager.Instances[instanceKey] = instance
+	instanceManager.Mutex.Unlock()
+
+	log.Printf("Created new instance: %s", instanceKey)
+
+	c.JSON(200, ConnectResponse{
+		Status:      "instance_created",
+		InstanceKey: instanceKey,
+		Message:     "Instance created successfully",
+	})
+}
+
+// connectInstance connects a specific instance
+func connectInstance(c *gin.Context) {
+	var req ConnectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.Lock()
+	defer instance.Mutex.Unlock()
+
+	if instance.IsConnected {
+		c.JSON(200, ConnectResponse{
+			Status:      "already_connected",
+			InstanceKey: req.InstanceKey,
+			Message:     "Instance is already connected",
+		})
+		return
+	}
+
+	// Check if already logged in
+	if instance.Client.IsLoggedIn() {
+		instance.IsConnected = true
+		// Get phone number
+		if instance.Client.Store.ID != nil {
+			instance.PhoneNumber = instance.Client.Store.ID.User
+		}
+		
+		c.JSON(200, ConnectResponse{
+			Status:      "already_logged_in",
+			InstanceKey: req.InstanceKey,
+			Message:     "Instance is already logged in",
+		})
+		return
+	}
+
+	// Get QR channel
+	qrChan, _ := instance.Client.GetQRChannel(context.Background())
+	err := instance.Client.Connect()
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Wait for QR code
+	go func() {
+		for evt := range qrChan {
+			if evt.Event == "code" {
+				instance.QRCodeChan <- evt.Code
+				break
+			}
+		}
+	}()
+
+	c.JSON(200, ConnectResponse{
+		Status:      "qr_generated",
+		InstanceKey: req.InstanceKey,
+		Message:     "QR code generated, scan to connect",
+	})
+}
+
+// getQRCode returns the QR code for a specific instance
+func getQRCode(c *gin.Context) {
+	instanceKey := c.Param("instanceKey")
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[instanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(200, gin.H{"status": "connected", "message": "Instance is already connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	select {
+	case qr := <-instance.QRCodeChan:
+		// Generate QR code
+		qrCode, err := qrcode.Encode(qr, qrcode.Medium, 256)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to generate QR code"})
+			return
+		}
+		c.Data(200, "image/png", qrCode)
+	case <-time.After(30 * time.Second):
+		c.JSON(408, gin.H{"error": "QR code timeout"})
+	}
+}
+
+// getInstanceStatus returns the status of a specific instance
+func getInstanceStatus(c *gin.Context) {
+	instanceKey := c.Param("instanceKey")
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[instanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	defer instance.Mutex.RUnlock()
+
+	c.JSON(200, gin.H{
+		"instance_key": instanceKey,
+		"connected":    instance.IsConnected,
+		"logged_in":    instance.Client.IsLoggedIn(),
+		"phone_number": instance.PhoneNumber,
+	})
+}
+
+// listInstances returns all instances
+func listInstances(c *gin.Context) {
+	instanceManager.Mutex.RLock()
+	defer instanceManager.Mutex.RUnlock()
+
+	instances := make([]gin.H, 0)
+	for key, instance := range instanceManager.Instances {
+		instance.Mutex.RLock()
+		instances = append(instances, gin.H{
+			"instance_key": key,
+			"connected":    instance.IsConnected,
+			"logged_in":    instance.Client.IsLoggedIn(),
+			"phone_number": instance.PhoneNumber,
+		})
+		instance.Mutex.RUnlock()
+	}
+
+	c.JSON(200, gin.H{
+		"instances": instances,
+		"count":     len(instances),
+	})
+}
+
+// disconnectInstance disconnects a specific instance
+func disconnectInstance(c *gin.Context) {
+	instanceKey := c.Param("instanceKey")
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[instanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.Lock()
+	defer instance.Mutex.Unlock()
+
+	if instance.Client != nil {
+		instance.Client.Disconnect()
+	}
+	instance.IsConnected = false
+
+	c.JSON(200, gin.H{
+		"status":       "disconnected",
+		"instance_key": instanceKey,
+		"message":      "Instance disconnected successfully",
+	})
+}
+
+// handleInstanceEvents handles events for a specific instance
+func handleInstanceEvents(instanceKey string, evt interface{}) {
+	// Send event to Node.js with instance information
+	sendWebhook("event", evt, instanceKey)
+	
+	// Handle connection events - check for successful login
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[instanceKey]
+	instanceManager.Mutex.RUnlock()
+	
+	if exists && instance.Client.IsLoggedIn() {
+		instance.Mutex.Lock()
+		instance.IsConnected = true
+		if instance.Client.Store.ID != nil {
+			instance.PhoneNumber = instance.Client.Store.ID.User
+		}
+		instance.Mutex.Unlock()
+		
+		log.Printf("Instance %s connected with phone number: %s", instanceKey, instance.PhoneNumber)
+	}
+}
+
+// sendWebhook sends webhook data to Node.js with instance information
+func sendWebhook(eventType string, data interface{}, instanceKey string) {
+	payload := WebhookPayload{
+		Event:     eventType,
+		Instance:  instanceKey,
+		Timestamp: time.Now(),
+		Data:      data,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Error marshaling webhook payload: %v", err)
+		return
+	}
+
+	// Send to Node.js webhook receiver
+	resp, err := http.Post("http://webhook-receiver:5555/webhook", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error sending webhook for instance %s: %v", instanceKey, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("Webhook sent for instance %s: %s", instanceKey, eventType)
+}
+
+// sendTextMessage sends a text message to a specific phone number
+func sendTextMessage(c *gin.Context) {
+	var req MessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(req.Phone)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		return
+	}
+
+	// Create text message
+	msg := &waE2E.Message{
+		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: proto.String(req.Message),
+		},
+	}
+
+	// Add reply context if provided
+	if req.ReplyTo != "" {
+		msg.ExtendedTextMessage.ContextInfo = &waE2E.ContextInfo{
+			StanzaID: proto.String(req.ReplyTo),
+		}
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, MessageResponse{
+		Status:    "sent",
+		MessageID: resp.ID,
+	})
+}
+
+// sendMediaMessage sends a media message (image, audio, video, file) to a specific phone number
+func sendMediaMessage(c *gin.Context) {
+	var req MediaMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(req.Phone)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		return
+	}
+
+	// Download media from URL
+	httpResp, err := http.Get(req.URL)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to download media from URL"})
+		return
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		c.JSON(500, gin.H{"error": fmt.Sprintf("Failed to download media: %d", httpResp.StatusCode)})
+		return
+	}
+
+	mediaData, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to read media data"})
+		return
+	}
+
+	// Create media directory if it doesn't exist
+	mediaDir := "./media"
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to create media directory"})
+		return
+	}
+
+	// Generate unique filename
+	filename := fmt.Sprintf("%s_%d", req.Type, time.Now().Unix())
+	var filepath string
+	var msg *waE2E.Message
+
+	switch req.Type {
+	case "image":
+		filepath = fmt.Sprintf("%s/%s.jpg", mediaDir, filename)
+		if err := os.WriteFile(filepath, mediaData, 0644); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to save image"})
+			return
+		}
+		defer os.Remove(filepath) // Clean up after sending
+
+		// Upload image to WhatsApp
+		uploaded, err := instance.Client.Upload(context.Background(), mediaData, whatsmeow.MediaImage)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to upload image"})
+			return
+		}
+
+		msg = &waE2E.Message{
+			ImageMessage: &waE2E.ImageMessage{
+				URL:           proto.String(uploaded.URL),
+				DirectPath:    proto.String(uploaded.DirectPath),
+				MediaKey:      uploaded.MediaKey,
+				FileEncSHA256: uploaded.FileEncSHA256,
+				FileSHA256:    uploaded.FileSHA256,
+				FileLength:    proto.Uint64(uploaded.FileLength),
+				Caption:       proto.String(req.Caption),
+			},
+		}
+
+	case "audio":
+		filepath = fmt.Sprintf("%s/%s.mp3", mediaDir, filename)
+		if err := os.WriteFile(filepath, mediaData, 0644); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to save audio"})
+			return
+		}
+		defer os.Remove(filepath) // Clean up after sending
+
+		// Upload audio to WhatsApp
+		uploaded, err := instance.Client.Upload(context.Background(), mediaData, whatsmeow.MediaAudio)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to upload audio"})
+			return
+		}
+
+		msg = &waE2E.Message{
+			AudioMessage: &waE2E.AudioMessage{
+				URL:           proto.String(uploaded.URL),
+				DirectPath:    proto.String(uploaded.DirectPath),
+				MediaKey:      uploaded.MediaKey,
+				FileEncSHA256: uploaded.FileEncSHA256,
+				FileSHA256:    uploaded.FileSHA256,
+				FileLength:    proto.Uint64(uploaded.FileLength),
+			},
+		}
+
+	case "video":
+		filepath = fmt.Sprintf("%s/%s.mp4", mediaDir, filename)
+		if err := os.WriteFile(filepath, mediaData, 0644); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to save video"})
+			return
+		}
+		defer os.Remove(filepath) // Clean up after sending
+
+		// Upload video to WhatsApp
+		uploaded, err := instance.Client.Upload(context.Background(), mediaData, whatsmeow.MediaVideo)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to upload video"})
+			return
+		}
+
+		msg = &waE2E.Message{
+			VideoMessage: &waE2E.VideoMessage{
+				URL:           proto.String(uploaded.URL),
+				DirectPath:    proto.String(uploaded.DirectPath),
+				MediaKey:      uploaded.MediaKey,
+				FileEncSHA256: uploaded.FileEncSHA256,
+				FileSHA256:    uploaded.FileSHA256,
+				FileLength:    proto.Uint64(uploaded.FileLength),
+				Caption:       proto.String(req.Caption),
+			},
+		}
+
+	case "file":
+		filepath = fmt.Sprintf("%s/%s", mediaDir, filename)
+		if err := os.WriteFile(filepath, mediaData, 0644); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to save file"})
+			return
+		}
+		defer os.Remove(filepath) // Clean up after sending
+
+		// Upload document to WhatsApp
+		uploaded, err := instance.Client.Upload(context.Background(), mediaData, whatsmeow.MediaDocument)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to upload document"})
+			return
+		}
+
+		msg = &waE2E.Message{
+			DocumentMessage: &waE2E.DocumentMessage{
+				URL:           proto.String(uploaded.URL),
+				DirectPath:    proto.String(uploaded.DirectPath),
+				MediaKey:      uploaded.MediaKey,
+				FileEncSHA256: uploaded.FileEncSHA256,
+				FileSHA256:    uploaded.FileSHA256,
+				FileLength:    proto.Uint64(uploaded.FileLength),
+				FileName:      proto.String(filename),
+			},
+		}
+
+	default:
+		c.JSON(400, gin.H{"error": "Invalid media type"})
+		return
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, MessageResponse{
+		Status:    "sent",
+		MessageID: resp.ID,
+	})
+}
+
+// handleWebhook handles incoming webhooks from Node.js
+func handleWebhook(c *gin.Context) {
+	var msg IncomingMessage
+	if err := c.ShouldBindJSON(&msg); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid webhook payload"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[msg.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		log.Printf("Received webhook for unknown instance: %s", msg.InstanceKey)
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		log.Printf("Received webhook for disconnected instance: %s", msg.InstanceKey)
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	instance.Mutex.Lock()
+	defer instance.Mutex.Unlock()
+
+	// Handle different message types
+	switch msg.MessageType {
+	case "text":
+		handleTextMessage(instance, msg)
+	case "image":
+		handleImageMessage(instance, msg)
+	case "audio":
+		handleAudioMessage(instance, msg)
+	case "video":
+		handleVideoMessage(instance, msg)
+	case "document":
+		handleDocumentMessage(instance, msg)
+	default:
+		log.Printf("Received unknown message type: %s", msg.MessageType)
+		c.JSON(200, gin.H{"status": "received", "message": "Message received", "type": msg.MessageType})
+	}
+}
+
+// handleTextMessage handles incoming text messages
+func handleTextMessage(instance *Instance, msg IncomingMessage) {
+	// Parse recipient JID
+	recipient, err := types.ParseJID(msg.From)
+	if err != nil {
+		log.Printf("Error parsing recipient JID %s: %v", msg.From, err)
+		return
+	}
+
+	// Create text message
+	waMsg := &waE2E.Message{
+		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: proto.String(msg.Message),
+		},
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, waMsg)
+	if err != nil {
+		log.Printf("Error sending text message to %s: %v", msg.From, err)
+		sendWebhook("message_error", gin.H{"instance_key": msg.InstanceKey, "phone": msg.From, "error": err.Error()}, msg.InstanceKey)
+		return
+	}
+	
+	log.Printf("Sent text message to %s: %s (ID: %s)", msg.From, msg.Message, resp.ID)
+	sendWebhook("message_sent", gin.H{"instance_key": msg.InstanceKey, "phone": msg.From, "message_id": resp.ID}, msg.InstanceKey)
+}
+
+// handleImageMessage handles incoming image messages
+func handleImageMessage(instance *Instance, msg IncomingMessage) {
+	// For simplicity, we'll just log the image URL.
+	// In a real scenario, you'd download the image and send it as a media message.
+	log.Printf("Received image message from %s: %s", msg.From, msg.Message)
+	sendWebhook("message_received", gin.H{"instance_key": msg.InstanceKey, "from": msg.From, "message": msg.Message, "type": msg.MessageType}, msg.InstanceKey)
+}
+
+// handleAudioMessage handles incoming audio messages
+func handleAudioMessage(instance *Instance, msg IncomingMessage) {
+	// For simplicity, we'll just log the audio URL.
+	// In a real scenario, you'd download the audio and send it as a media message.
+	log.Printf("Received audio message from %s: %s", msg.From, msg.Message)
+	sendWebhook("message_received", gin.H{"instance_key": msg.InstanceKey, "from": msg.From, "message": msg.Message, "type": msg.MessageType}, msg.InstanceKey)
+}
+
+// handleVideoMessage handles incoming video messages
+func handleVideoMessage(instance *Instance, msg IncomingMessage) {
+	// For simplicity, we'll just log the video URL.
+	// In a real scenario, you'd download the video and send it as a media message.
+	log.Printf("Received video message from %s: %s", msg.From, msg.Message)
+	sendWebhook("message_received", gin.H{"instance_key": msg.InstanceKey, "from": msg.From, "message": msg.Message, "type": msg.MessageType}, msg.InstanceKey)
+}
+
+// handleDocumentMessage handles incoming document messages
+func handleDocumentMessage(instance *Instance, msg IncomingMessage) {
+	// For simplicity, we'll just log the document URL.
+	// In a real scenario, you'd download the document and send it as a media message.
+	log.Printf("Received document message from %s: %s", msg.From, msg.Message)
+	sendWebhook("message_received", gin.H{"instance_key": msg.InstanceKey, "from": msg.From, "message": msg.Message, "type": msg.MessageType}, msg.InstanceKey)
+}
