@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "62e123dfa3b859c5d29cb803257c69e5"
+  "instance_key": "014d7aa1242be8c1ecec45a71638e6c2"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/62e123dfa3b859c5d29cb803257c69e5/qr
+GET http://localhost:4444/instance/014d7aa1242be8c1ecec45a71638e6c2/qr
 
 ###
 

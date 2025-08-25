@@ -667,7 +667,7 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 	var enhancedData interface{}
 	
 	if msgEvent, ok := data.(*events.Message); ok {
-		// Create a copy of the event data to modify
+		// Start with the full raw event data
 		enhancedData = data
 		
 		// Check for media and download if present
@@ -681,92 +681,107 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 			// Check for different media types and download them
 			if img := msgEvent.Message.GetImageMessage(); img != nil {
 				if extractedMedia, err := downloadMedia(ctx, instance.Client, img, instanceKey); err == nil {
-					// Replace the image message with download info
+					// Add media download info to the raw data
 					enhancedData = map[string]interface{}{
-						"message_id": msgEvent.Info.ID,
-						"chat_id": msgEvent.Info.Chat.User,
-						"sender_id": msgEvent.Info.Sender.User,
-						"from": msgEvent.Info.SourceString(),
-						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						// Full raw event data
+						"raw_event": data,
+						"message": msgEvent.Message,
+						"info": msgEvent.Info,
+						"source_string": msgEvent.Info.SourceString(),
 						"push_name": msgEvent.Info.PushName,
 						"is_from_me": msgEvent.Info.IsFromMe,
 						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						
+						// Media download information
 						"media_type": "image",
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
 						"caption": extractedMedia.Caption,
+						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
 					}
 				}
 			} else if vid := msgEvent.Message.GetVideoMessage(); vid != nil {
 				if extractedMedia, err := downloadMedia(ctx, instance.Client, vid, instanceKey); err == nil {
 					enhancedData = map[string]interface{}{
-						"message_id": msgEvent.Info.ID,
-						"chat_id": msgEvent.Info.Chat.User,
-						"sender_id": msgEvent.Info.Sender.User,
-						"from": msgEvent.Info.SourceString(),
-						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						// Full raw event data
+						"raw_event": data,
+						"message": msgEvent.Message,
+						"info": msgEvent.Info,
+						"source_string": msgEvent.Info.SourceString(),
 						"push_name": msgEvent.Info.PushName,
 						"is_from_me": msgEvent.Info.IsFromMe,
 						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						
+						// Media download information
 						"media_type": "video",
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
 						"caption": extractedMedia.Caption,
+						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
 					}
 				}
 			} else if aud := msgEvent.Message.GetAudioMessage(); aud != nil {
 				if extractedMedia, err := downloadMedia(ctx, instance.Client, aud, instanceKey); err == nil {
 					enhancedData = map[string]interface{}{
-						"message_id": msgEvent.Info.ID,
-						"chat_id": msgEvent.Info.Chat.User,
-						"sender_id": msgEvent.Info.Sender.User,
-						"from": msgEvent.Info.SourceString(),
-						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						// Full raw event data
+						"raw_event": data,
+						"message": msgEvent.Message,
+						"info": msgEvent.Info,
+						"source_string": msgEvent.Info.SourceString(),
 						"push_name": msgEvent.Info.PushName,
 						"is_from_me": msgEvent.Info.IsFromMe,
 						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						
+						// Media download information
 						"media_type": "audio",
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
+						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
 					}
 				}
 			} else if doc := msgEvent.Message.GetDocumentMessage(); doc != nil {
 				if extractedMedia, err := downloadMedia(ctx, instance.Client, doc, instanceKey); err == nil {
 					enhancedData = map[string]interface{}{
-						"message_id": msgEvent.Info.ID,
-						"chat_id": msgEvent.Info.Chat.User,
-						"sender_id": msgEvent.Info.Sender.User,
-						"from": msgEvent.Info.SourceString(),
-						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						// Full raw event data
+						"raw_event": data,
+						"message": msgEvent.Message,
+						"info": msgEvent.Info,
+						"source_string": msgEvent.Info.SourceString(),
 						"push_name": msgEvent.Info.PushName,
 						"is_from_me": msgEvent.Info.IsFromMe,
 						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						
+						// Media download information
 						"media_type": "document",
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
 						"caption": extractedMedia.Caption,
 						"filename": doc.GetFileName(),
+						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
 					}
 				}
 			} else if stk := msgEvent.Message.GetStickerMessage(); stk != nil {
 				if extractedMedia, err := downloadMedia(ctx, instance.Client, stk, instanceKey); err == nil {
 					enhancedData = map[string]interface{}{
-						"message_id": msgEvent.Info.ID,
-						"chat_id": msgEvent.Info.Chat.User,
-						"sender_id": msgEvent.Info.Sender.User,
-						"from": msgEvent.Info.SourceString(),
-						"timestamp": msgEvent.Info.Timestamp.Format(time.RFC3339),
+						// Full raw event data
+						"raw_event": data,
+						"message": msgEvent.Message,
+						"info": msgEvent.Info,
+						"source_string": msgEvent.Info.SourceString(),
 						"push_name": msgEvent.Info.PushName,
 						"is_from_me": msgEvent.Info.IsFromMe,
 						"is_group": msgEvent.Info.Chat.Server == "g.us",
+						
+						// Media download information
 						"media_type": "sticker",
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
+						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
 					}
 				}
 			}
