@@ -132,6 +132,21 @@ type IncomingMessage struct {
 
 var instanceManager *InstanceManager
 
+// PhoneValidationRequest represents a phone validation request
+type PhoneValidationRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+}
+
+// PhoneValidationResponse represents the response from phone validation
+type PhoneValidationResponse struct {
+	Status        string `json:"status"`
+	OriginalPhone string `json:"original_phone"`
+	ValidPhone    string `json:"valid_phone"`
+	Exists        bool   `json:"exists"`
+	Message       string `json:"message,omitempty"`
+}
+
 func main() {
 	// Initialize instance manager
 	instanceManager = &InstanceManager{
@@ -158,6 +173,10 @@ func main() {
 
 	// Disconnect instance endpoint
 	r.POST("/instance/:instanceKey/disconnect", disconnectInstance)
+
+	// Phone validation endpoint
+	r.POST("/phone/validate", validatePhone)
+	r.POST("/phone/test-exists", testPhoneExists)
 
 	// Message sending endpoints
 	r.POST("/message/send", sendTextMessage)
@@ -232,6 +251,291 @@ func parseJIDWithLIDSupport(phone string, instance *Instance) (types.JID, error)
 	}
 
 	return types.JID{}, fmt.Errorf("invalid phone number format: %s", phone)
+}
+
+// validateBrazilianPhoneNumber validates and corrects Brazilian phone numbers
+func validateBrazilianPhoneNumber(phone string, instance *Instance) (string, bool, error) {
+	// Remove any non-digit characters
+	cleanPhone := strings.ReplaceAll(phone, "@s.whatsapp.net", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, "@lid", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, "-", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, " ", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, "(", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, ")", "")
+	
+	// Check if it's a Brazilian number (starts with 55)
+	if !strings.HasPrefix(cleanPhone, "55") {
+		return phone, false, fmt.Errorf("not a Brazilian phone number")
+	}
+	
+	// Extract the area code and number
+	if len(cleanPhone) < 12 {
+		return phone, false, fmt.Errorf("invalid phone number length")
+	}
+	
+	areaCode := cleanPhone[2:4]
+	number := cleanPhone[4:]
+	
+	// Check if it's a mobile number (area codes that use 9-digit numbers)
+	mobileAreaCodes := map[string]bool{
+		"11": true, "12": true, "13": true, "14": true, "15": true, "16": true, "17": true, "18": true, "19": true,
+		"21": true, "22": true, "24": true, "27": true, "28": true,
+		"31": true, "32": true, "33": true, "34": true, "35": true, "37": true, "38": true,
+		"41": true, "42": true, "43": true, "44": true, "45": true, "46": true, "47": true, "48": true, "49": true,
+		"51": true, "53": true, "54": true, "55": true,
+		"61": true, "62": true, "63": true, "64": true, "65": true, "66": true, "67": true, "68": true, "69": true,
+		"71": true, "73": true, "74": true, "75": true, "77": true, "79": true,
+		"81": true, "82": true, "83": true, "84": true, "85": true, "86": true, "87": true, "88": true, "89": true,
+		"91": true, "92": true, "93": true, "94": true, "95": true, "96": true, "97": true, "98": true, "99": true,
+	}
+	
+	isMobileArea := mobileAreaCodes[areaCode]
+	
+	// First, try the number as received (original format)
+	originalPhone := "55" + areaCode + number + "@s.whatsapp.net"
+	log.Printf("🔍 Step 1: Checking original number: %s", originalPhone)
+	originalExists, _ := checkPhoneExists(originalPhone, instance)
+	log.Printf("📊 Original number %s exists: %v", originalPhone, originalExists)
+	
+	if isMobileArea {
+		// For mobile numbers, try variations
+		if len(number) == 8 {
+			// Try adding 9 at the beginning
+			phoneWith9 := "55" + areaCode + "9" + number + "@s.whatsapp.net"
+			with9Exists, _ := checkPhoneExists(phoneWith9, instance)
+			
+			// Return the one that exists, or original if neither exists
+			if originalExists {
+				return originalPhone, true, nil
+			} else if with9Exists {
+				return phoneWith9, true, nil
+			} else {
+				return originalPhone, false, nil
+			}
+		} else if len(number) == 9 {
+			// Check if it starts with 9
+			if strings.HasPrefix(number, "9") {
+				// Try removing the 9
+				phoneWithout9 := "55" + areaCode + number[1:] + "@s.whatsapp.net"
+				without9Exists, _ := checkPhoneExists(phoneWithout9, instance)
+				
+				// Return the one that exists, or original if neither exists
+				if originalExists {
+					return originalPhone, true, nil
+				} else if without9Exists {
+					return phoneWithout9, true, nil
+				} else {
+					return originalPhone, false, nil
+				}
+			} else {
+				// Number has 9 digits but doesn't start with 9
+				// Try adding 9 at the beginning
+				phoneWith9 := "55" + areaCode + "9" + number + "@s.whatsapp.net"
+				with9Exists, _ := checkPhoneExists(phoneWith9, instance)
+				
+				// Return the one that exists, or original if neither exists
+				if originalExists {
+					return originalPhone, true, nil
+				} else if with9Exists {
+					return phoneWith9, true, nil
+				} else {
+					return originalPhone, false, nil
+				}
+			}
+		} else if len(number) == 10 {
+			// Number has 10 digits, might need 9 added
+			phoneWith9 := "55" + areaCode + "9" + number + "@s.whatsapp.net"
+			with9Exists, _ := checkPhoneExists(phoneWith9, instance)
+			
+			// Return the one that exists, or original if neither exists
+			if originalExists {
+				return originalPhone, true, nil
+			} else if with9Exists {
+				return phoneWith9, true, nil
+			} else {
+				return originalPhone, false, nil
+			}
+		} else if len(number) == 11 {
+			// Number has 11 digits, might need 9 removed (like 5541991968071 -> 554191968071)
+			// Check if it starts with 9
+			if strings.HasPrefix(number, "9") {
+				// Try removing the 9
+				phoneWithout9 := "55" + areaCode + number[1:] + "@s.whatsapp.net"
+				log.Printf("🔍 Step 2: Checking without 9: %s", phoneWithout9)
+				without9Exists, _ := checkPhoneExists(phoneWithout9, instance)
+				log.Printf("📊 Without 9 number %s exists: %v", phoneWithout9, without9Exists)
+				
+				// Return the one that exists, or original if neither exists
+				if originalExists {
+					return originalPhone, true, nil
+				} else if without9Exists {
+					return phoneWithout9, true, nil
+				} else {
+					return originalPhone, false, nil
+				}
+			} else {
+				// Number has 11 digits but doesn't start with 9
+				// Try adding 9 at the beginning
+				phoneWith9 := "55" + areaCode + "9" + number + "@s.whatsapp.net"
+				with9Exists, _ := checkPhoneExists(phoneWith9, instance)
+				
+				// Return the one that exists, or original if neither exists
+				if originalExists {
+					return originalPhone, true, nil
+				} else if with9Exists {
+					return phoneWith9, true, nil
+				} else {
+					return originalPhone, false, nil
+				}
+			}
+		}
+	}
+	
+	// For landline numbers or any other case, return the original
+	return originalPhone, originalExists, nil
+}
+
+// checkPhoneExists checks if a phone number exists on WhatsApp
+func checkPhoneExists(phone string, instance *Instance) (bool, error) {
+	if instance == nil || instance.Client == nil {
+		return false, fmt.Errorf("instance not available")
+	}
+
+	// Only check if the JID is a user with @s.whatsapp.net
+	if strings.Contains(phone, "@s.whatsapp.net") {
+		log.Printf("🔍 Checking if phone exists: %s", phone)
+		
+		// First try the IsOnWhatsApp API
+		data, err := instance.Client.IsOnWhatsApp([]string{phone})
+		if err != nil {
+			log.Printf("❌ Error checking phone %s: %v", phone, err)
+			return false, fmt.Errorf("failed to check if user is on whatsapp: %v", err)
+		}
+
+		log.Printf("📊 WhatsApp API response for %s: %+v", phone, data)
+		
+		// Check if any number exists according to the API and detect redirections
+		apiExists := false
+		redirectedJID := ""
+		for _, v := range data {
+			log.Printf("📱 Phone %s - IsIn: %v", v.JID, v.IsIn)
+			if v.IsIn {
+				apiExists = true
+				// Check if WhatsApp redirected us to a different JID
+				if v.JID.String() != phone {
+					redirectedJID = v.JID.String()
+					log.Printf("🔄 WhatsApp redirected %s to %s", phone, v.JID.String())
+				}
+			}
+		}
+		
+		// If API says it doesn't exist, return false
+		if !apiExists {
+			log.Printf("❌ Phone %s does NOT exist on WhatsApp (API check)", phone)
+			return false, nil
+		}
+		
+		// If WhatsApp redirected us to a different JID, that means the original doesn't exist
+		if redirectedJID != "" {
+			log.Printf("❌ Phone %s does NOT exist on WhatsApp (redirected to %s)", phone, redirectedJID)
+			return false, nil
+		}
+		
+		// If API says it exists and no redirection, do a double-check by trying to get user info
+		jid, err := types.ParseJID(phone)
+		if err != nil {
+			log.Printf("❌ Error parsing JID %s: %v", phone, err)
+			return false, err
+		}
+		
+		// Try to get user info - this will fail if the user doesn't exist
+		userInfo, err := instance.Client.GetUserInfo([]types.JID{jid})
+		if err != nil {
+			log.Printf("❌ Phone %s does NOT exist on WhatsApp (GetUserInfo failed): %v", phone, err)
+			return false, nil
+		}
+		
+		if len(userInfo) == 0 {
+			log.Printf("❌ Phone %s does NOT exist on WhatsApp (no user info)", phone)
+			return false, nil
+		}
+		
+		log.Printf("✅ Phone %s exists on WhatsApp (confirmed by GetUserInfo)", phone)
+		return true, nil
+	}
+
+	return false, fmt.Errorf("phone number must end with @s.whatsapp.net for validation")
+}
+
+// validateAndCorrectPhone validates and corrects a phone number for Brazilian numbers
+func validateAndCorrectPhone(phone string, instance *Instance) (string, error) {
+	// First try to parse as regular JID
+	if jid, err := types.ParseJID(phone); err == nil {
+		// If it's already a valid JID, check if it exists
+		if exists, _ := checkPhoneExists(jid.String(), instance); exists {
+			return jid.String(), nil
+		}
+	}
+	
+	// Check if it's a LID format (ends with @lid)
+	if strings.HasSuffix(phone, "@lid") {
+		lidJID, err := types.ParseJID(phone)
+		if err != nil {
+			return phone, fmt.Errorf("invalid LID format: %v", err)
+		}
+		
+		// Try to get phone number for this LID
+		if instance.Client != nil && instance.Client.Store != nil && instance.Client.Store.LIDs != nil {
+			ctx := context.Background()
+			pn, err := instance.Client.Store.LIDs.GetPNForLID(ctx, lidJID)
+			if err != nil {
+				log.Printf("Warning: Could not get phone number for LID %s: %v", lidJID.String(), err)
+				return lidJID.String(), nil
+			}
+			if !pn.IsEmpty() {
+				log.Printf("Resolved LID %s to phone number %s", lidJID.String(), pn.String())
+				return pn.String(), nil
+			}
+		}
+		
+		return lidJID.String(), nil
+	}
+	
+	// If it doesn't end with @s.whatsapp.net or @lid, try Brazilian validation
+	if !strings.Contains(phone, "@") {
+		// Try Brazilian phone validation
+		validPhone, exists, err := validateBrazilianPhoneNumber(phone, instance)
+		if err == nil {
+			if exists {
+				log.Printf("Validated Brazilian phone number: %s -> %s (exists)", phone, validPhone)
+				return validPhone, nil
+			} else {
+				log.Printf("Validated Brazilian phone number: %s -> %s (doesn't exist)", phone, validPhone)
+				return validPhone, nil
+			}
+		}
+		
+		// If Brazilian validation fails, try adding @s.whatsapp.net
+		phoneWithSuffix := phone + "@s.whatsapp.net"
+		if jid, err := types.ParseJID(phoneWithSuffix); err == nil {
+			return jid.String(), nil
+		}
+	} else if strings.Contains(phone, "@s.whatsapp.net") {
+		// If it already has @s.whatsapp.net, try Brazilian validation on the number part
+		numberPart := strings.ReplaceAll(phone, "@s.whatsapp.net", "")
+		validPhone, exists, err := validateBrazilianPhoneNumber(numberPart, instance)
+		if err == nil {
+			if exists {
+				log.Printf("Validated Brazilian phone number with suffix: %s -> %s (exists)", phone, validPhone)
+				return validPhone, nil
+			} else {
+				log.Printf("Validated Brazilian phone number with suffix: %s -> %s (doesn't exist)", phone, validPhone)
+				return validPhone, nil
+			}
+		}
+	}
+	
+	return phone, fmt.Errorf("invalid phone number format: %s", phone)
 }
 
 // createInstance creates a new WhatsApp instance
@@ -474,6 +778,122 @@ func disconnectInstance(c *gin.Context) {
 		"instance_key": instanceKey,
 		"message":      "Instance disconnected successfully",
 	})
+}
+
+// validatePhone validates and corrects a phone number
+func validatePhone(c *gin.Context) {
+	var req PhoneValidationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Validate and correct the phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, PhoneValidationResponse{
+			Status:        "error",
+			OriginalPhone: req.Phone,
+			ValidPhone:    req.Phone,
+			Exists:        false,
+			Message:       err.Error(),
+		})
+		return
+	}
+
+	// Check if the validated phone exists
+	phoneExists, _ := checkPhoneExists(validPhone, instance)
+
+	c.JSON(200, PhoneValidationResponse{
+		Status:        "success",
+		OriginalPhone: req.Phone,
+		ValidPhone:    validPhone,
+		Exists:        phoneExists,
+		Message:       "Phone number validated successfully",
+	})
+}
+
+// testPhoneExists is a debug endpoint to test WhatsApp API directly
+func testPhoneExists(c *gin.Context) {
+	var req PhoneValidationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Test the phone number directly with WhatsApp API
+	phoneToTest := req.Phone
+	if !strings.Contains(phoneToTest, "@s.whatsapp.net") {
+		phoneToTest = phoneToTest + "@s.whatsapp.net"
+	}
+
+	log.Printf("🧪 Testing phone existence directly: %s", phoneToTest)
+	
+	data, err := instance.Client.IsOnWhatsApp([]string{phoneToTest})
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": fmt.Sprintf("WhatsApp API error: %v", err),
+			"phone": phoneToTest,
+		})
+		return
+	}
+
+	log.Printf("📊 Raw WhatsApp API response: %+v", data)
+
+	response := gin.H{
+		"phone": phoneToTest,
+		"raw_response": data,
+		"exists": false,
+		"details": []gin.H{},
+	}
+
+	for _, v := range data {
+		detail := gin.H{
+			"jid": v.JID,
+			"is_in": v.IsIn,
+		}
+		response["details"] = append(response["details"].([]gin.H), detail)
+		
+		if v.IsIn {
+			response["exists"] = true
+		}
+	}
+
+	c.JSON(200, response)
 }
 
 // handleInstanceEvents handles events for a specific instance
@@ -898,8 +1318,6 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 	log.Printf("Webhook sent for instance %s: %s", instanceKey, eventType)
 }
 
-
-
 // sendTextMessage sends a text message to a specific phone number
 func sendTextMessage(c *gin.Context) {
 	var req MessageRequest
@@ -925,8 +1343,15 @@ func sendTextMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
-	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
+	// Validate and correct phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(validPhone)
 	if err != nil {
 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
@@ -984,8 +1409,15 @@ func sendMediaMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
-	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
+	// Validate and correct phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(validPhone)
 	if err != nil {
 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
@@ -1181,8 +1613,15 @@ func sendContactMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
-	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
+	// Validate and correct phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(validPhone)
 	if err != nil {
 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
@@ -1253,8 +1692,15 @@ func sendVoiceMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
-	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
+	// Validate and correct phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(validPhone)
 	if err != nil {
 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
@@ -1364,8 +1810,15 @@ func sendLocationMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
-	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
+	// Validate and correct phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(validPhone)
 	if err != nil {
 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
@@ -1449,10 +1902,17 @@ func handleWebhook(c *gin.Context) {
 
 // handleTextMessage handles incoming text messages
 func handleTextMessage(instance *Instance, msg IncomingMessage) {
-	// Parse recipient JID (support both @s.whatsapp.net and @lid)
-	recipient, err := parseJIDWithLIDSupport(msg.From, instance)
+	// Validate and correct recipient JID
+	recipient, err := validateAndCorrectPhone(msg.From, instance)
 	if err != nil {
 		log.Printf("Error parsing recipient JID %s: %v", msg.From, err)
+		return
+	}
+
+	// Parse recipient JID
+	jid, err := types.ParseJID(recipient)
+	if err != nil {
+		log.Printf("Error parsing recipient JID %s: %v", recipient, err)
 		return
 	}
 
@@ -1464,7 +1924,7 @@ func handleTextMessage(instance *Instance, msg IncomingMessage) {
 	}
 
 	// Send message
-	resp, err := instance.Client.SendMessage(context.Background(), recipient, waMsg)
+	resp, err := instance.Client.SendMessage(context.Background(), jid, waMsg)
 	if err != nil {
 		log.Printf("Error sending text message to %s: %v", msg.From, err)
 		sendWebhook("message_error", gin.H{"instance_key": msg.InstanceKey, "phone": msg.From, "error": err.Error()}, msg.InstanceKey)
@@ -1506,3 +1966,4 @@ func handleDocumentMessage(instance *Instance, msg IncomingMessage) {
 	log.Printf("Received document message from %s: %s", msg.From, msg.Message)
 	sendWebhook("message_received", gin.H{"instance_key": msg.InstanceKey, "from": msg.From, "message": msg.Message, "type": msg.MessageType}, msg.InstanceKey)
 }
+

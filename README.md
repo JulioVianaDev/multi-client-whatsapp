@@ -5,10 +5,50 @@ A multi-instance WhatsApp bridge built with Go and whatsmeow, featuring media do
 ## Features
 
 - **Multi-instance Support**: Create and manage multiple WhatsApp instances
+- **Brazilian Phone Validation**: Automatic 9-digit handling for Brazilian mobile numbers
 - **Media Download**: Automatically download and store media files (images, videos, audio, documents, stickers)
 - **Webhook Integration**: Send detailed webhooks to Node.js with event type identification
 - **Persistent Storage**: Media files are stored in Docker volumes for persistence
 - **Static File Server**: Access downloaded media files via HTTP endpoints
+
+## Brazilian Phone Number Validation
+
+The system includes automatic validation and correction for Brazilian phone numbers, handling the 9-digit mobile number requirement.
+
+### How it Works
+
+1. **Automatic 9-digit Addition**: For Brazilian mobile numbers without the 9-digit prefix, the system automatically adds it
+2. **Smart Validation**: Checks if the number exists with and without the 9-digit prefix
+3. **Area Code Support**: Supports all Brazilian area codes that use 9-digit mobile numbers
+4. **Landline Handling**: Landline numbers are not modified
+
+### Example
+
+```bash
+# Input: 551288053918 (without 9)
+# Output: 5512988053918@s.whatsapp.net (with 9 added)
+
+# Input: 5512988053918 (with 9)
+# Output: 5512988053918@s.whatsapp.net (unchanged)
+```
+
+### API Endpoint
+
+```bash
+POST /phone/validate
+{
+  "instance_key": "abc123def456",
+  "phone": "551288053918"
+}
+```
+
+### Supported Area Codes
+
+All major Brazilian area codes that use 9-digit mobile numbers:
+
+- São Paulo (11), Rio de Janeiro (21), Belo Horizonte (31)
+- Curitiba (41), Porto Alegre (51), Brasília (61)
+- Salvador (71), Recife (81), Belém (91), and many others
 
 ## Media Download Functionality
 

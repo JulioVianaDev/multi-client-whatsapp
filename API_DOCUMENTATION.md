@@ -112,6 +112,70 @@ Disconnects a WhatsApp instance.
 }
 ```
 
+## Phone Number Validation
+
+### Validate Phone Number
+
+**POST** `/phone/validate`
+
+Validates and corrects Brazilian phone numbers with smart 9-digit handling.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "551288053918"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "original_phone": "551288053918",
+  "valid_phone": "5512988053918@s.whatsapp.net",
+  "exists": true,
+  "message": "Phone number validated successfully"
+}
+```
+
+**How it works (CORRECTED LOGIC):**
+
+1. **Always Try Original First**: The system first checks if the number exists exactly as provided
+2. **Smart Fallback**: Only if the original number doesn't exist, then try variations:
+   - For 8-digit numbers: Try adding "9" prefix
+   - For 9-digit numbers starting with "9": Try removing the "9"
+   - For other 9-digit numbers: Try adding "9" prefix
+3. **Prevents Wrong Modifications**: Won't modify numbers that already exist correctly
+4. **Area Code Support**: Supports all Brazilian area codes that use 9-digit mobile numbers
+5. **Landline Handling**: Landline numbers are not modified
+
+**Examples:**
+
+```bash
+# Case 1: Number exists as provided (no modification needed)
+Input: 554191968071
+Logic: Try 554191968071 → Found! → Return 554191968071@s.whatsapp.net
+Result: No modification (prevents wrong 5541991968071)
+
+# Case 2: Number needs 9 added
+Input: 551288053918
+Logic: Try 551288053918 → Not found → Try 5512988053918 → Found!
+Result: 5512988053918@s.whatsapp.net
+
+# Case 3: Number has 9 but should be removed
+Input: 5512988053918
+Logic: Try 5512988053918 → Not found → Try 551288053918 → Found!
+Result: 551288053918@s.whatsapp.net
+```
+
+**Brazilian Area Codes with 9-digit mobile numbers:**
+
+- São Paulo (11), Rio de Janeiro (21), Belo Horizonte (31), Curitiba (41), Porto Alegre (51)
+- Brasília (61), Salvador (71), Recife (81), Belém (91), and many others
+
 ## Message Sending
 
 ### Send Text Message

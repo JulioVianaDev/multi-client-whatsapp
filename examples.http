@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "bbf38a27a0e76ea8da2c5b4af67d139b"
+  "instance_key": "ef8a422ce7d28ae32c027261c9c96998"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/bbf38a27a0e76ea8da2c5b4af67d139b/qr
+GET http://localhost:4444/instance/ef8a422ce7d28ae32c027261c9c96998/qr
 
 ###
 
@@ -43,29 +43,101 @@ Content-Type: application/json
 ###
 
 ### ========================================
+### PHONE NUMBER VALIDATION (Brazilian Numbers)
+### ========================================
+
+### 7. Validate Brazilian phone number without 9 digits (auto-adds 9)
+POST http://localhost:4444/phone/validate
+Content-Type: application/json
+
+{
+  "instance_key": "ef8a422ce7d28ae32c027261c9c96998",
+  "phone": "554191968071"
+}
+
+###
+
+### 8. Validate Brazilian phone number with 9 digits
+POST http://localhost:4444/phone/validate
+Content-Type: application/json
+
+{
+  "instance_key": "ef8a422ce7d28ae32c027261c9c96998",
+  "phone": "5541991968071"
+}
+
+###
+
+### 9. Validate landline number (no 9-digit modification)
+POST http://localhost:4444/phone/validate
+Content-Type: application/json
+
+{
+  "instance_key": "ef8a422ce7d28ae32c027261c9c96998",
+  "phone": "551288053918"
+}
+
+###
+
+### 10. Validate number with @s.whatsapp.net suffix
+POST http://localhost:4444/phone/validate
+Content-Type: application/json
+
+{
+  "instance_key": "ef8a422ce7d28ae32c027261c9c96998",
+  "phone": "551288053918@s.whatsapp.net"
+}
+
+###
+
+### 11. Validate non-Brazilian number
+POST http://localhost:4444/phone/validate
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890"
+}
+
+###
+
+### ========================================
 ### MESSAGE SENDING (Go Service)
 ### ========================================
 
-### 7. Send text message via Go service
+### 12. Send text message via Go service (with auto-validation)
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
 {
-  "instance_key": "62e123dfa3b859c5d29cb803257c69e5",
-  "phone": "16174658484@s.whatsapp.net",
-  "message": "Hello from WhatsApp jean! 🚀",
+  "instance_key": "ef8a422ce7d28ae32c027261c9c96998",
+  "phone": "5541991968071",
+  "message": "Teste com correção de número de telefone auto-corrected phone number! 🇧🇷",
   "reply_to": ""
 }
 
 ###
 
-### 8. Send image message via Go service
+### 13. Send text message with 9-digit number
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "bbf38a27a0e76ea8da2c5b4af67d139b",
+  "phone": "551288053918",
+  "message": "Hello from WhatsApp with correct 9-digit number! 📱",
+  "reply_to": ""
+}
+
+###
+
+### 14. Send image message via Go service (with auto-validation)
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
 {
   "instance_key": "abc123def456",
-  "phone": "1234567890@s.whatsapp.net",
+  "phone": "551288053918",
   "url": "https://picsum.photos/400/300",
   "type": "image",
   "caption": "Check out this beautiful image! 📸"
@@ -293,8 +365,8 @@ POST http://localhost:5555/message/send
 Content-Type: application/json
 
 {
-  "instance_key": "695affce903adf26f87c024bf9f2eaec",
-  "phone": "142039232581665@lid",
+  "instance_key": "a7303c48718185883626ec88a92606ae",
+  "phone": "85263741124677@lid",
   "message": "Hello LID contact via Node.js proxy! 🔗"
 }
 
@@ -653,9 +725,9 @@ POST http://localhost:4444/message/send
 Content-Type: application/json
 
 {
-  "instance_key": "695affce903adf26f87c024bf9f2eaec",
-  "phone": "13271465758823@lid",
-  "message": "testando"
+  "instance_key": "a7303c48718185883626ec88a92606ae",
+  "phone": "85766302642309@lid",
+  "message": "mensagem de lid"
 }
 
 ###
