@@ -147,6 +147,21 @@ type PhoneValidationResponse struct {
 	Message       string `json:"message,omitempty"`
 }
 
+// LIDToPhoneRequest represents a LID to phone conversion request
+type LIDToPhoneRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	LID         string `json:"lid" binding:"required"`
+}
+
+// LIDToPhoneResponse represents the response from LID to phone conversion
+type LIDToPhoneResponse struct {
+	Status      string `json:"status"`
+	LID         string `json:"lid"`
+	PhoneNumber string `json:"phone_number,omitempty"`
+	Exists      bool   `json:"exists"`
+	Message     string `json:"message,omitempty"`
+}
+
 func main() {
 	// Initialize instance manager
 	instanceManager = &InstanceManager{
@@ -177,6 +192,7 @@ func main() {
 	// Phone validation endpoint
 	r.POST("/phone/validate", validatePhone)
 	r.POST("/phone/test-exists", testPhoneExists)
+	r.POST("/phone/lid-to-phone", convertLIDToPhone)
 
 	// Message sending endpoints
 	r.POST("/message/send", sendTextMessage)
@@ -894,6 +910,100 @@ func testPhoneExists(c *gin.Context) {
 	}
 
 	c.JSON(200, response)
+}
+
+// convertLIDToPhone converts a LID to a phone number
+func convertLIDToPhone(c *gin.Context) {
+	var req LIDToPhoneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Validate LID format
+	if !strings.HasSuffix(req.LID, "@lid") {
+		c.JSON(400, LIDToPhoneResponse{
+			Status:  "error",
+			LID:     req.LID,
+			Exists:  false,
+			Message: "Invalid LID format. LID must end with @lid",
+		})
+		return
+	}
+
+	// Parse LID
+	lidJID, err := types.ParseJID(req.LID)
+	if err != nil {
+		c.JSON(400, LIDToPhoneResponse{
+			Status:  "error",
+			LID:     req.LID,
+			Exists:  false,
+			Message: fmt.Sprintf("Invalid LID format: %v", err),
+		})
+		return
+	}
+
+	// Check if LIDs store is available
+	if instance.Client == nil || instance.Client.Store == nil || instance.Client.Store.LIDs == nil {
+		c.JSON(500, LIDToPhoneResponse{
+			Status:  "error",
+			LID:     req.LID,
+			Exists:  false,
+			Message: "LID store not available",
+		})
+		return
+	}
+
+	// Get phone number for this LID
+	ctx := context.Background()
+	phoneNumber, err := instance.Client.Store.LIDs.GetPNForLID(ctx, lidJID)
+	if err != nil {
+		log.Printf("Error getting phone number for LID %s: %v", lidJID.String(), err)
+		c.JSON(500, LIDToPhoneResponse{
+			Status:  "error",
+			LID:     req.LID,
+			Exists:  false,
+			Message: fmt.Sprintf("Failed to get phone number for LID: %v", err),
+		})
+		return
+	}
+
+	// Check if phone number exists
+	if phoneNumber.IsEmpty() {
+		c.JSON(200, LIDToPhoneResponse{
+			Status:  "success",
+			LID:     req.LID,
+			Exists:  false,
+			Message: "LID found but no phone number associated",
+		})
+		return
+	}
+
+	// Return the phone number
+	c.JSON(200, LIDToPhoneResponse{
+		Status:      "success",
+		LID:         req.LID,
+		PhoneNumber: phoneNumber.String(),
+		Exists:      true,
+		Message:     "Phone number found for LID",
+	})
 }
 
 // handleInstanceEvents handles events for a specific instance
