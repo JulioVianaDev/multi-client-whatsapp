@@ -1,1 +1,4 @@
 /media/*
+/database_volume/*.db
+/database_volume/*.db-shm
+/database_volume/*.db-wal

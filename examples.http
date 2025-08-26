@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "378bf5331efb1f295922c9de2a9e3fba"
+  "instance_key": "bbf38a27a0e76ea8da2c5b4af67d139b"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/378bf5331efb1f295922c9de2a9e3fba/qr
+GET http://localhost:4444/instance/bbf38a27a0e76ea8da2c5b4af67d139b/qr
 
 ###
 
@@ -288,11 +288,23 @@ Content-Type: application/json
 
 ###
 
+### 27. Send text to LID contact via Node.js proxy
+POST http://localhost:5555/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "695affce903adf26f87c024bf9f2eaec",
+  "phone": "142039232581665@lid",
+  "message": "Hello LID contact via Node.js proxy! 🔗"
+}
+
+###
+
 ### ========================================
 ### WEBHOOK TESTING
 ### ========================================
 
-### 27. Test webhook functionality
+### 28. Test webhook functionality
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -309,7 +321,7 @@ Content-Type: application/json
 
 ###
 
-### 28. Test incoming message webhook
+### 29. Test incoming message webhook
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -326,7 +338,7 @@ Content-Type: application/json
 
 ###
 
-### 29. Test image message webhook
+### 30. Test image message webhook
 POST http://localhost:5555/webhook
 Content-Type: application/json
 
@@ -347,23 +359,23 @@ Content-Type: application/json
 ### NODE.JS PROXY MANAGEMENT
 ### ========================================
 
-### 30. Get scan instructions from Node.js
+### 31. Get scan instructions from Node.js
 GET http://localhost:5555/scan
 
 ###
 
-### 31. List instances via Node.js proxy
+### 32. List instances via Node.js proxy
 GET http://localhost:5555/instances
 
 ###
 
-### 32. Create instance via Node.js proxy
+### 33. Create instance via Node.js proxy
 POST http://localhost:5555/instance/create
 Content-Type: application/json
 
 ###
 
-### 33. Connect instance via Node.js proxy
+### 34. Connect instance via Node.js proxy
 POST http://localhost:5555/instance/connect
 Content-Type: application/json
 
@@ -373,12 +385,12 @@ Content-Type: application/json
 
 ###
 
-### 34. Get QR code via Node.js proxy (replace {instanceKey})
+### 35. Get QR code via Node.js proxy (replace {instanceKey})
 GET http://localhost:5555/instance/abc123def456/qr
 
 ###
 
-### 35. Check status via Node.js proxy (replace {instanceKey})
+### 36. Check status via Node.js proxy (replace {instanceKey})
 GET http://localhost:5555/instance/abc123def456/status
 
 ###
@@ -387,7 +399,7 @@ GET http://localhost:5555/instance/abc123def456/status
 ### ERROR TESTING
 ### ========================================
 
-### 36. Test invalid instance key
+### 37. Test invalid instance key
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -399,7 +411,7 @@ Content-Type: application/json
 
 ###
 
-### 37. Test invalid phone number format
+### 38. Test invalid phone number format
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -411,7 +423,7 @@ Content-Type: application/json
 
 ###
 
-### 38. Test missing required fields
+### 39. Test missing required fields
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -421,7 +433,7 @@ Content-Type: application/json
 
 ###
 
-### 39. Test invalid media type
+### 40. Test invalid media type
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -434,7 +446,7 @@ Content-Type: application/json
 
 ###
 
-### 40. Test invalid media URL
+### 41. Test invalid media URL
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -451,7 +463,7 @@ Content-Type: application/json
 ### GROUP MESSAGES
 ### ========================================
 
-### 41. Send message to group (replace with actual group ID)
+### 42. Send message to group (replace with actual group ID)
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -463,7 +475,7 @@ Content-Type: application/json
 
 ###
 
-### 42. Send media to group
+### 43. Send media to group
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -481,7 +493,7 @@ Content-Type: application/json
 ### BULK MESSAGES (Multiple recipients)
 ### ========================================
 
-### 43. Send to multiple individual numbers
+### 44. Send to multiple individual numbers
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -493,7 +505,7 @@ Content-Type: application/json
 
 ###
 
-### 44. Send media to multiple recipients
+### 45. Send media to multiple recipients
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -511,7 +523,7 @@ Content-Type: application/json
 ### REPLY MESSAGES
 ### ========================================
 
-### 45. Reply to a specific message
+### 46. Reply to a specific message
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -524,7 +536,7 @@ Content-Type: application/json
 
 ###
 
-### 46. Reply with media
+### 47. Reply with media
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -543,12 +555,12 @@ Content-Type: application/json
 ### HEALTH CHECKS
 ### ========================================
 
-### 47. Check if Go service is running
+### 48. Check if Go service is running
 GET http://localhost:4444/instances
 
 ###
 
-### 48. Check if Node.js service is running
+### 49. Check if Node.js service is running
 GET http://localhost:5555/scan
 
 ###
@@ -572,7 +584,7 @@ GET http://localhost:5555/scan
 ### USING VARIABLES
 ### ========================================
 
-### 49. Send text using variables
+### 50. Send text using variables
 POST http://localhost:4444/message/send
 Content-Type: application/json
 
@@ -584,7 +596,7 @@ Content-Type: application/json
 
 ###
 
-### 50. Send image using variables
+### 51. Send image using variables
 POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
@@ -598,7 +610,7 @@ Content-Type: application/json
 
 ###
 
-### 51. Send contact using variables
+### 52. Send contact using variables
 POST http://localhost:4444/message/send-contact
 Content-Type: application/json
 
@@ -611,7 +623,7 @@ Content-Type: application/json
 
 ###
 
-### 52. Send voice recording using variables
+### 53. Send voice recording using variables
 POST http://localhost:4444/message/send-voice
 Content-Type: application/json
 
@@ -623,7 +635,7 @@ Content-Type: application/json
 
 ###
 
-### 53. Send location using variables
+### 54. Send location using variables
 POST http://localhost:4444/message/send-location
 Content-Type: application/json
 
@@ -632,6 +644,45 @@ Content-Type: application/json
   "phone": "{{phone_number}}",
   "latitude": -23.5505,
   "longitude": -46.6333
+}
+
+###
+
+### 55. Send text message to LID contact
+POST http://localhost:4444/message/send
+Content-Type: application/json
+
+{
+  "instance_key": "695affce903adf26f87c024bf9f2eaec",
+  "phone": "13271465758823@lid",
+  "message": "testando"
+}
+
+###
+
+### 56. Send media to LID contact
+POST http://localhost:4444/message/send-media
+Content-Type: application/json
+
+{
+  "instance_key": "bfc8baadb83578f7a427e0e4209d4d05",
+  "phone": "1234567890@lid",
+  "url": "https://picsum.photos/400/300",
+  "type": "image",
+  "caption": "Image for LID contact! 📸"
+}
+
+###
+
+### 57. Send contact to LID contact
+POST http://localhost:4444/message/send-contact
+Content-Type: application/json
+
+{
+  "instance_key": "bfc8baadb83578f7a427e0e4209d4d05",
+  "phone": "1234567890@lid",
+  "contact_name": "John Doe",
+  "contact_phone": "9876543210@s.whatsapp.net"
 }
 
 ###
@@ -645,9 +696,10 @@ Content-Type: application/json
 ### 2. Replace "1234567890@s.whatsapp.net" with actual phone numbers
 ### 3. Phone numbers must include @s.whatsapp.net suffix
 ### 4. Group IDs must include @g.us suffix
-### 5. Media URLs must be publicly accessible
-### 6. Instance must be connected before sending messages
-### 7. QR code must be scanned before instance is usable
+### 5. LID contacts use @lid suffix (e.g., "1234567890@lid")
+### 6. Media URLs must be publicly accessible
+### 7. Instance must be connected before sending messages
+### 8. QR code must be scanned before instance is usable
 
 ### SUPPORTED MEDIA TYPES:
 ### - image: JPG, PNG, GIF, etc.

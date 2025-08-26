@@ -189,13 +189,66 @@ func generateInstanceKey() string {
 	return hex.EncodeToString(bytes)
 }
 
+// parseJIDWithLIDSupport parses a JID with support for both @s.whatsapp.net and @lid
+func parseJIDWithLIDSupport(phone string, instance *Instance) (types.JID, error) {
+	// First try to parse as regular JID
+	if jid, err := types.ParseJID(phone); err == nil {
+		return jid, nil
+	}
+
+	// Check if it's a LID format (ends with @lid)
+	if strings.HasSuffix(phone, "@lid") {
+		// Try to parse as LID
+		lidJID, err := types.ParseJID(phone)
+		if err != nil {
+			return types.JID{}, fmt.Errorf("invalid LID format: %v", err)
+		}
+
+		// Try to get phone number for this LID
+		if instance.Client != nil && instance.Client.Store != nil && instance.Client.Store.LIDs != nil {
+			ctx := context.Background()
+			pn, err := instance.Client.Store.LIDs.GetPNForLID(ctx, lidJID)
+			if err != nil {
+				log.Printf("Warning: Could not get phone number for LID %s: %v", lidJID.String(), err)
+				// Return the LID anyway, as it might still work
+				return lidJID, nil
+			}
+			if !pn.IsEmpty() {
+				log.Printf("Resolved LID %s to phone number %s", lidJID.String(), pn.String())
+				return pn, nil
+			}
+		}
+
+		// Return the LID if we can't resolve it
+		return lidJID, nil
+	}
+
+	// If it doesn't end with @s.whatsapp.net or @lid, try to add @s.whatsapp.net
+	if !strings.Contains(phone, "@") {
+		phoneWithSuffix := phone + "@s.whatsapp.net"
+		if jid, err := types.ParseJID(phoneWithSuffix); err == nil {
+			return jid, nil
+		}
+	}
+
+	return types.JID{}, fmt.Errorf("invalid phone number format: %s", phone)
+}
+
 // createInstance creates a new WhatsApp instance
 func createInstance(c *gin.Context) {
 	instanceKey := generateInstanceKey()
 
+	// Create database directory if it doesn't exist
+	dbDir := "/app/database_volume"
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		log.Printf("Error creating database directory: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to create database directory"})
+		return
+	}
+
 	// Setup database for this instance
 	dbLog := waLog.Stdout(fmt.Sprintf("Database-%s", instanceKey), "DEBUG", true)
-	dbPath := fmt.Sprintf("./whatsapp_%s.db?_foreign_keys=on", instanceKey)
+	dbPath := fmt.Sprintf("%s/whatsapp_%s.db?_foreign_keys=on", dbDir, instanceKey)
 	
 	container, err := sqlstore.New(context.Background(), "sqlite3", dbPath, dbLog)
 	if err != nil {
@@ -872,10 +925,10 @@ func sendTextMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID
-	recipient, err := types.ParseJID(req.Phone)
+	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
+	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
 	}
 
@@ -931,10 +984,10 @@ func sendMediaMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID
-	recipient, err := types.ParseJID(req.Phone)
+	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
+	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
 	}
 
@@ -1128,10 +1181,10 @@ func sendContactMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID
-	recipient, err := types.ParseJID(req.Phone)
+	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
+	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
 	}
 
@@ -1200,10 +1253,10 @@ func sendVoiceMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID
-	recipient, err := types.ParseJID(req.Phone)
+	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
+	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
 	}
 
@@ -1311,10 +1364,10 @@ func sendLocationMessage(c *gin.Context) {
 	}
 	instance.Mutex.RUnlock()
 
-	// Parse phone number to JID
-	recipient, err := types.ParseJID(req.Phone)
+	// Parse phone number to JID (support both @s.whatsapp.net and @lid)
+	recipient, err := parseJIDWithLIDSupport(req.Phone, instance)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid phone number format"})
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
 		return
 	}
 
@@ -1396,8 +1449,8 @@ func handleWebhook(c *gin.Context) {
 
 // handleTextMessage handles incoming text messages
 func handleTextMessage(instance *Instance, msg IncomingMessage) {
-	// Parse recipient JID
-	recipient, err := types.ParseJID(msg.From)
+	// Parse recipient JID (support both @s.whatsapp.net and @lid)
+	recipient, err := parseJIDWithLIDSupport(msg.From, instance)
 	if err != nil {
 		log.Printf("Error parsing recipient JID %s: %v", msg.From, err)
 		return

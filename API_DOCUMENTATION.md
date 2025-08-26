@@ -371,6 +371,15 @@ Phone numbers should be in the following format:
 
 - **Individual**: `1234567890@s.whatsapp.net`
 - **Group**: `1234567890-1234567890@g.us`
+- **Linked ID (LID)**: `1234567890@lid` (for contacts that don't have @s.whatsapp.net)
+
+### LID Support
+
+The API supports sending messages to contacts using Linked IDs (LID) when the contact doesn't have a standard @s.whatsapp.net format. The system will:
+
+1. **Try to resolve LID to phone number** - If possible, convert the LID to the actual phone number
+2. **Fallback to LID** - If resolution fails, send the message using the LID directly
+3. **Auto-format** - If no suffix is provided, automatically add @s.whatsapp.net
 
 ## Error Responses
 
@@ -483,7 +492,19 @@ curl -X POST http://localhost:4444/message/send-location \
   }'
 ```
 
-### 8. Send via Node.js Proxy
+### 8. Send to LID Contact
+
+```bash
+curl -X POST http://localhost:4444/message/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance_key": "abc123def456",
+    "phone": "1234567890@lid",
+    "message": "Hello LID contact!"
+  }'
+```
+
+### 9. Send via Node.js Proxy
 
 ```bash
 curl -X POST http://localhost:5555/message/send \

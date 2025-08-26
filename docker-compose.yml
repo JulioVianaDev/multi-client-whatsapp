@@ -14,6 +14,8 @@ services:
       - whatsapp_data:/root/data
       # Media storage - bind mount for easy access on host
       - ./media:/app/media
+      # Database storage - bind mount for easy access on host
+      - ./database_volume:/app/database_volume
     environment:
       - TZ=UTC
     restart: unless-stopped
