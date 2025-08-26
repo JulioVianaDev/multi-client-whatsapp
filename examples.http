@@ -111,8 +111,8 @@ Content-Type: application/json
 
 {
   "instance_key": "ef8a422ce7d28ae32c027261c9c96998",
-  "phone": "5541991968071",
-  "message": "Teste com correção de número de telefone auto-corrected phone number! 🇧🇷",
+  "phone": "554191968071",
+  "message": "Teste com correção de número de atomatado! 🇧🇷",
   "reply_to": ""
 }
 
