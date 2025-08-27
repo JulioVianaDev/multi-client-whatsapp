@@ -333,7 +333,12 @@ app.post("/message/send-location", async (req, res) => {
   try {
     const { instance_key, phone, latitude, longitude, reply_to } = req.body;
 
-    if (!instance_key || !phone || latitude === undefined || longitude === undefined) {
+    if (
+      !instance_key ||
+      !phone ||
+      latitude === undefined ||
+      longitude === undefined
+    ) {
       return res.status(400).json({
         error: "instance_key, phone, latitude, and longitude are required",
       });
@@ -357,18 +362,71 @@ app.post("/message/send-location", async (req, res) => {
     );
 
     console.log(
+      chalk.green(`✅ Location sent successfully: ${response.data.message_id}`)
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.log(chalk.red(`❌ Failed to send location: ${error.message}`));
+    res.status(500).json({ error: "Failed to send location" });
+  }
+});
+
+app.post("/message/send-interactive", async (req, res) => {
+  try {
+    const { instance_key, phone, title, body, footer, buttons, reply_to } =
+      req.body;
+
+    if (
+      !instance_key ||
+      !phone ||
+      !title ||
+      !body ||
+      !buttons ||
+      !Array.isArray(buttons) ||
+      buttons.length === 0
+    ) {
+      return res.status(400).json({
+        error:
+          "instance_key, phone, title, body, and buttons array are required",
+      });
+    }
+
+    if (buttons.length > 3) {
+      return res.status(400).json({
+        error: "Maximum 3 buttons allowed",
+      });
+    }
+
+    console.log(
+      chalk.blue(
+        `🔘 Sending interactive message with ${buttons.length} button(s) to ${phone} via instance ${instance_key}`
+      )
+    );
+
+    const response = await axios.post(
+      "http://localhost:4444/message/send-interactive",
+      {
+        instance_key,
+        phone,
+        title,
+        body,
+        footer,
+        buttons,
+        reply_to,
+      }
+    );
+
+    console.log(
       chalk.green(
-        `✅ Location sent successfully: ${response.data.message_id}`
+        `✅ Interactive message sent successfully: ${response.data.message_id}`
       )
     );
     res.json(response.data);
   } catch (error) {
     console.log(
-      chalk.red(
-        `❌ Failed to send location: ${error.message}`
-      )
+      chalk.red(`❌ Failed to send interactive message: ${error.message}`)
     );
-    res.status(500).json({ error: "Failed to send location" });
+    res.status(500).json({ error: "Failed to send interactive message" });
   }
 });
 

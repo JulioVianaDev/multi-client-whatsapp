@@ -112,6 +112,23 @@ type ContactMessageRequest struct {
 	ReplyTo     string `json:"reply_to,omitempty"`
 }
 
+// InteractiveMessageRequest represents an interactive message sending request
+type InteractiveMessageRequest struct {
+	InstanceKey string `json:"instance_key" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+	Title       string `json:"title" binding:"required"`
+	Body        string `json:"body" binding:"required"`
+	Footer      string `json:"footer,omitempty"`
+	Buttons     []Button `json:"buttons" binding:"required"`
+	ReplyTo     string `json:"reply_to,omitempty"`
+}
+
+// Button represents a button in an interactive message
+type Button struct {
+	ID    string `json:"id" binding:"required"`
+	Title string `json:"title" binding:"required"`
+}
+
 // MessageResponse represents the response from message sending
 type MessageResponse struct {
 	Status    string `json:"status"`
@@ -200,6 +217,7 @@ func main() {
 	r.POST("/message/send-contact", sendContactMessage)
 	r.POST("/message/send-voice", sendVoiceMessage)
 	r.POST("/message/send-location", sendLocationMessage)
+	r.POST("/message/send-interactive", sendInteractiveMessage)
 
 	// Webhook endpoint for incoming messages
 	r.POST("/webhook", handleWebhook)
@@ -1076,6 +1094,9 @@ func getEventType(evt interface{}) string {
 		}
 		if e.Message.GetOrderMessage() != nil {
 			return "order_received"
+		}
+		if e.Message.GetInteractiveMessage() != nil {
+			return "interactive_message_received"
 		}
 		return "message_received"
 		
@@ -1959,6 +1980,93 @@ func sendLocationMessage(c *gin.Context) {
 	c.JSON(200, MessageResponse{
 		Status:    "sent",
 		MessageID: resp.ID,
+	})
+}
+
+// sendInteractiveMessage sends an interactive message with buttons to a specific phone number
+func sendInteractiveMessage(c *gin.Context) {
+	var req InteractiveMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[req.InstanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	instance.Mutex.RLock()
+	if !instance.IsConnected {
+		instance.Mutex.RUnlock()
+		c.JSON(400, gin.H{"error": "Instance is not connected"})
+		return
+	}
+	instance.Mutex.RUnlock()
+
+	// Validate and correct phone number
+	validPhone, err := validateAndCorrectPhone(req.Phone, instance)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Parse phone number to JID
+	recipient, err := types.ParseJID(validPhone)
+	if err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid phone number format: %v", err)})
+		return
+	}
+
+	// Validate buttons (max 3 buttons allowed)
+	if len(req.Buttons) > 3 {
+		c.JSON(400, gin.H{"error": "Maximum 3 buttons allowed"})
+		return
+	}
+
+	if len(req.Buttons) == 0 {
+		c.JSON(400, gin.H{"error": "At least one button is required"})
+		return
+	}
+
+	// For now, send a simple text message with button information
+	// TODO: Implement proper interactive message when protobuf structure is confirmed
+	buttonText := "Available options:\n"
+	for i, button := range req.Buttons {
+		buttonText += fmt.Sprintf("%d. %s\n", i+1, button.Title)
+	}
+	
+	messageText := fmt.Sprintf("**%s**\n\n%s\n\n%s\n\n%s", req.Title, req.Body, buttonText, req.Footer)
+
+	// Create text message with button information
+	msg := &waE2E.Message{
+		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: proto.String(messageText),
+		},
+	}
+
+	// Add reply context if provided
+	if req.ReplyTo != "" {
+		msg.ExtendedTextMessage.ContextInfo = &waE2E.ContextInfo{
+			StanzaID: proto.String(req.ReplyTo),
+		}
+	}
+
+	// Send message
+	resp, err := instance.Client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, MessageResponse{
+		Status:    "sent",
+		MessageID: resp.ID,
+		Error:     "Note: Interactive buttons not yet implemented. Sent as formatted text message.",
 	})
 }
 

@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14"
+  "instance_key": "fde807d3d684199733c5680ca63c867f"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/f744b809555fbdfa217aa79f857e3c14/qr
+GET http://localhost:4444/instance/fde807d3d684199733c5680ca63c867f/qr
 
 ###
 
@@ -51,7 +51,7 @@ POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14",
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
   "phone": "551288053918"
 }
 
@@ -62,8 +62,8 @@ POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14",
-  "phone": "5512988053918"
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
+  "phone": "554191968071"
 }
 
 ###
@@ -73,8 +73,8 @@ POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14",
-  "phone": "551288053918"
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
+  "phone": "5541991968071"
 }
 
 ###
@@ -84,7 +84,7 @@ POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14",
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
   "phone": "551288053918@s.whatsapp.net"
 }
 
@@ -106,8 +106,8 @@ POST http://localhost:4444/phone/lid-to-phone
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14",
-  "lid": "251496138592474@lid"
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
+  "lid": "123456789@lid"
 }
 
 ###
@@ -132,8 +132,8 @@ POST http://localhost:4444/message/send
 Content-Type: application/json
 
 {
-  "instance_key": "f744b809555fbdfa217aa79f857e3c14",
-  "phone": "554191968071",
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
+  "phone": "5541991968071",
   "message": "Teste com correção de número de atomatado! 🇧🇷",
   "reply_to": ""
 }
@@ -378,6 +378,131 @@ Content-Type: application/json
   "phone": "1234567890@s.whatsapp.net",
   "latitude": -23.5505,
   "longitude": -46.6333
+}
+
+###
+
+### 27. Send interactive message with buttons (Go API)
+POST http://localhost:4444/message/send-interactive
+Content-Type: application/json
+
+{
+  "instance_key": "fde807d3d684199733c5680ca63c867f",
+  "phone": "5512988053918@s.whatsapp.net",
+  "title": "Choose an option",
+  "body": "Please select one of the following options:",
+  "footer": "Powered by WhatsApp Bridge",
+  "buttons": [
+    {
+      "id": "option_1",
+      "title": "Option 1"
+    },
+    {
+      "id": "option_2",
+      "title": "Option 2"
+    },
+    {
+      "id": "option_3",
+      "title": "Option 3"
+    }
+  ]
+}
+
+###
+
+### 28. Send interactive message with 2 buttons
+POST http://localhost:4444/message/send-interactive
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "title": "Customer Support",
+  "body": "How can we help you today?",
+  "footer": "Select an option below",
+  "buttons": [
+    {
+      "id": "support_general",
+      "title": "General Support"
+    },
+    {
+      "id": "support_technical",
+      "title": "Technical Support"
+    }
+  ]
+}
+
+###
+
+### 29. Send interactive message with single button
+POST http://localhost:4444/message/send-interactive
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "title": "Welcome!",
+  "body": "Thank you for using our service. Click the button below to get started.",
+  "footer": "Get started now",
+  "buttons": [
+    {
+      "id": "get_started",
+      "title": "Get Started"
+    }
+  ]
+}
+
+###
+
+### 30. Send interactive message with reply
+POST http://localhost:4444/message/send-interactive
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "title": "Survey Response",
+  "body": "How would you rate our service?",
+  "footer": "Your feedback helps us improve",
+  "reply_to": "3EB0C767D82B3C2E",
+  "buttons": [
+    {
+      "id": "rating_excellent",
+      "title": "Excellent"
+    },
+    {
+      "id": "rating_good",
+      "title": "Good"
+    },
+    {
+      "id": "rating_fair",
+      "title": "Fair"
+    }
+  ]
+}
+
+###
+
+### 31. Send interactive message via Node.js proxy
+POST http://localhost:5555/message/send-interactive
+Content-Type: application/json
+
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "title": "Customer Support",
+  "body": "How can we help you today?",
+  "footer": "Select an option below",
+  "buttons": [
+    {
+      "id": "support_general",
+      "title": "General Support"
+    },
+    {
+      "id": "support_technical",
+      "title": "Technical Support"
+    }
+  ]
 }
 
 ###

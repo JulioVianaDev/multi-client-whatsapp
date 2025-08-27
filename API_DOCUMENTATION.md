@@ -318,6 +318,78 @@ Sends a location message to a specific phone number.
 }
 ```
 
+### Send Interactive Message
+
+**POST** `/message/send-interactive`
+
+Sends an interactive message with buttons to a specific phone number.
+
+**Request Body:**
+
+```json
+{
+  "instance_key": "abc123def456",
+  "phone": "1234567890@s.whatsapp.net",
+  "title": "Choose an option",
+  "body": "Please select one of the following options:",
+  "footer": "Powered by WhatsApp Bridge",
+  "buttons": [
+    {
+      "id": "option_1",
+      "title": "Option 1"
+    },
+    {
+      "id": "option_2",
+      "title": "Option 2"
+    },
+    {
+      "id": "option_3",
+      "title": "Option 3"
+    }
+  ],
+  "reply_to": "optional_message_id_to_reply_to"
+}
+```
+
+**Button Structure:**
+
+- `id`: Unique identifier for the button (required)
+- `title`: Display text for the button (required)
+
+**Limitations:**
+
+- Maximum 3 buttons allowed
+- At least 1 button required
+- Button titles should be short and descriptive
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "3EB0C767D82B3C2E",
+  "error": "Note: Interactive buttons not yet implemented. Sent as formatted text message."
+}
+```
+
+**Current Implementation:**
+⚠️ **Note**: Due to protobuf structure complexity, interactive buttons are currently sent as formatted text messages. The message will include:
+- Title (in bold)
+- Body text
+- Numbered list of available options
+- Footer text
+
+**Example Use Cases:**
+
+- Customer support options
+- Survey responses
+- Menu selections
+- Confirmation dialogs
+- Call-to-action buttons
+
+**Future Enhancement:**
+The endpoint is ready for proper interactive button implementation once the correct WhatsApp protobuf structure is confirmed.
+
 ## Node.js Webhook Receiver Endpoints
 
 ### Send Text Message (via Node.js)
