@@ -20,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -183,6 +184,11 @@ type LIDToPhoneResponse struct {
 }
 
 func main() {
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No .env file found, using system environment variables")
+	}
+
 	// Load environment variables
 	webhookBaseURL = os.Getenv("EASY_ZAP_WEBHOOK_URL")
 	if webhookBaseURL == "" {
