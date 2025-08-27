@@ -157,6 +157,38 @@ The system identifies and categorizes various WhatsApp events:
 - `logged_out` - User logged out
 - `pair_success` - Device pairing successful
 
+## Environment Variables
+
+The application supports the following environment variables:
+
+### EASY_ZAP_WEBHOOK_URL
+
+This environment variable controls the base URL used for constructing local file URLs in webhook responses. It's used when the system downloads media files and needs to provide a publicly accessible URL for those files.
+
+**Default**: `http://localhost:4444`
+
+**Examples**:
+
+```bash
+# Development
+EASY_ZAP_WEBHOOK_URL=http://localhost:4444
+
+# Production with custom domain
+EASY_ZAP_WEBHOOK_URL=https://your-domain.com
+
+# Docker with custom port
+EASY_ZAP_WEBHOOK_URL=http://localhost:8080
+
+# HTTPS
+EASY_ZAP_WEBHOOK_URL=https://localhost:4444
+```
+
+**Usage**:
+
+- Set as environment variable: `export EASY_ZAP_WEBHOOK_URL=https://your-domain.com`
+- Add to `.env` file: `EASY_ZAP_WEBHOOK_URL=https://your-domain.com`
+- Set in `docker-compose.yml` environment section
+
 ## Docker Setup
 
 ```bash

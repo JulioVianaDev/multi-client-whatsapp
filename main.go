@@ -30,6 +30,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Global variable to store the webhook URL
+var webhookBaseURL string
+
 // Instance represents a WhatsApp client instance
 type Instance struct {
 	ID           string
@@ -180,6 +183,15 @@ type LIDToPhoneResponse struct {
 }
 
 func main() {
+	// Load environment variables
+	webhookBaseURL = os.Getenv("EASY_ZAP_WEBHOOK_URL")
+	if webhookBaseURL == "" {
+		webhookBaseURL = "http://localhost:4444" // Default fallback
+		log.Printf("EASY_ZAP_WEBHOOK_URL not set, using default: %s", webhookBaseURL)
+	} else {
+		log.Printf("Using webhook URL from environment: %s", webhookBaseURL)
+	}
+
 	// Initialize instance manager
 	instanceManager = &InstanceManager{
 		Instances: make(map[string]*Instance),
@@ -1332,7 +1344,7 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
 						"caption": extractedMedia.Caption,
-						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
+						"local_file_url": fmt.Sprintf("%s%s", webhookBaseURL, extractedMedia.URL),
 					}
 				}
 			} else if vid := msgEvent.Message.GetVideoMessage(); vid != nil {
@@ -1353,7 +1365,7 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
 						"caption": extractedMedia.Caption,
-						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
+						"local_file_url": fmt.Sprintf("%s%s", webhookBaseURL, extractedMedia.URL),
 					}
 				}
 			} else if aud := msgEvent.Message.GetAudioMessage(); aud != nil {
@@ -1373,7 +1385,7 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
-						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
+						"local_file_url": fmt.Sprintf("%s%s", webhookBaseURL, extractedMedia.URL),
 					}
 				}
 			} else if doc := msgEvent.Message.GetDocumentMessage(); doc != nil {
@@ -1395,7 +1407,7 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 						"mime_type": extractedMedia.MimeType,
 						"caption": extractedMedia.Caption,
 						"filename": doc.GetFileName(),
-						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
+						"local_file_url": fmt.Sprintf("%s%s", webhookBaseURL, extractedMedia.URL),
 					}
 				}
 			} else if stk := msgEvent.Message.GetStickerMessage(); stk != nil {
@@ -1415,7 +1427,7 @@ func sendWebhook(eventType string, data interface{}, instanceKey string) {
 						"media_url": extractedMedia.URL,
 						"media_path": extractedMedia.MediaPath,
 						"mime_type": extractedMedia.MimeType,
-						"local_file_url": fmt.Sprintf("http://localhost:4444%s", extractedMedia.URL),
+						"local_file_url": fmt.Sprintf("%s%s", webhookBaseURL, extractedMedia.URL),
 					}
 				}
 			}

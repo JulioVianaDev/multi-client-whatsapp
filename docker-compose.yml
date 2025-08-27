@@ -18,6 +18,8 @@ services:
       - ./database_volume:/app/database_volume
     environment:
       - TZ=UTC
+      # Uncomment and modify the line below to set a custom webhook URL
+      # - EASY_ZAP_WEBHOOK_URL=https://your-domain.com
     restart: unless-stopped
     networks:
       - whatsapp-network
