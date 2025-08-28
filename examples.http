@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "fde807d3d684199733c5680ca63c867f"
+  "instance_key": "dba28e7a8c7380cb2a26ec629ff82684"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/fde807d3d684199733c5680ca63c867f/qr
+GET http://localhost:4444/instance/dba28e7a8c7380cb2a26ec629ff82684/qr
 
 ###
 
@@ -42,11 +42,16 @@ Content-Type: application/json
 
 ###
 
+### 7. Delete an instance (replace {instance_key})
+DELETE http://localhost:4444/instance/abc123def456
+
+###
+
 ### ========================================
 ### PHONE NUMBER VALIDATION (Brazilian Numbers)
 ### ========================================
 
-### 7. Validate Brazilian phone number without 9 digits (auto-adds 9)
+### 8. Validate Brazilian phone number without 9 digits (auto-adds 9)
 POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
@@ -57,7 +62,7 @@ Content-Type: application/json
 
 ###554191968071
 
-### 8. Validate Brazilian phone number with 9 digits
+### 9. Validate Brazilian phone number with 9 digits
 POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
@@ -68,7 +73,7 @@ Content-Type: application/json
 
 ###
 
-### 9. Validate landline number (no 9-digit modification)
+### 10. Validate landline number (no 9-digit modification)
 POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
@@ -79,7 +84,7 @@ Content-Type: application/json
 
 ###
 
-### 10. Validate number with @s.whatsapp.net suffix
+### 11. Validate number with @s.whatsapp.net suffix
 POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
@@ -90,7 +95,7 @@ Content-Type: application/json
 
 ###
 
-### 11. Validate non-Brazilian number
+### 12. Validate non-Brazilian number
 POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
@@ -101,7 +106,7 @@ Content-Type: application/json
 
 ###
 
-### 12. Convert LID to phone number
+### 13. Convert LID to phone number
 POST http://localhost:4444/phone/lid-to-phone
 Content-Type: application/json
 
@@ -112,7 +117,7 @@ Content-Type: application/json
 
 ###
 
-### 13. Convert LID to phone number (another example)
+### 14. Convert LID to phone number (another example)
 POST http://localhost:4444/phone/lid-to-phone
 Content-Type: application/json
 

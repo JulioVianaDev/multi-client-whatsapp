@@ -112,6 +112,28 @@ Disconnects a WhatsApp instance.
 }
 ```
 
+### Delete Instance
+
+**DELETE** `/instance/{instanceKey}`
+
+Deletes a WhatsApp instance and all its associated data (database and media files).
+
+**Response:**
+
+```json
+{
+  "status": "deleted",
+  "instance_key": "abc123def456",
+  "message": "Instance and all associated data deleted successfully"
+}
+```
+
+**What gets deleted:**
+- Instance from memory
+- Database file (`/app/database_volume/whatsapp_{instanceKey}.db`)
+- Media directory (`/app/media/{instanceKey}/`)
+- All associated media files
+
 ## Phone Number Validation
 
 ### Validate Phone Number
@@ -656,6 +678,14 @@ curl -X POST http://localhost:5555/message/send \
 
 The system sends webhook events to the Node.js receiver for:
 
+### Connection Events
+- `instance_connected` - Instance successfully connected to WhatsApp
+- `instance_disconnected` - Instance disconnected from WhatsApp
+- `instance_manually_connected` - Instance manually connected via API
+- `instance_manually_disconnected` - Instance manually disconnected via API
+- `instance_deleted` - Instance deleted via API
+
+### Message Events
 - `connected` - WhatsApp connection established
 - `disconnected` - WhatsApp connection lost
 - `message` - New message received
@@ -663,6 +693,25 @@ The system sends webhook events to the Node.js receiver for:
 - `presence` - User presence update
 - `message_sent` - Message sent successfully
 - `message_error` - Message sending failed
+
+### Webhook Payload Format
+
+Connection events include additional information:
+
+```json
+{
+  "event": "instance_connected",
+  "event_type": "instance_connected",
+  "instance": "abc123def456",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "data": {
+    "instance_key": "abc123def456",
+    "phone_number": "1234567890",
+    "status": "connected",
+    "timestamp": "2024-01-01T12:00:00Z"
+  }
+}
+```
 
 ## Auto-Reply Feature
 

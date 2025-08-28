@@ -8,6 +8,8 @@ A multi-instance WhatsApp bridge built with Go and whatsmeow, featuring media do
 - **Brazilian Phone Validation**: Automatic 9-digit handling for Brazilian mobile numbers
 - **Media Download**: Automatically download and store media files (images, videos, audio, documents, stickers)
 - **Webhook Integration**: Send detailed webhooks to Node.js with event type identification
+- **Connection Webhooks**: Automatic webhooks for instance connection/disconnection events
+- **Instance Management**: Complete instance lifecycle management including deletion
 - **Persistent Storage**: Media files are stored in Docker volumes for persistence
 - **Static File Server**: Access downloaded media files via HTTP endpoints
 
@@ -41,6 +43,49 @@ POST /phone/validate
   "phone": "551288053918"
 }
 ```
+
+## Instance Management
+
+The system provides complete lifecycle management for WhatsApp instances:
+
+### Create Instance
+```bash
+POST /instance/create
+```
+
+### Connect Instance
+```bash
+POST /instance/connect
+{
+  "instance_key": "abc123def456"
+}
+```
+
+### Disconnect Instance
+```bash
+POST /instance/{instanceKey}/disconnect
+```
+
+### Delete Instance
+```bash
+DELETE /instance/{instanceKey}
+```
+
+**What gets deleted when an instance is deleted:**
+- Instance from memory
+- Database file (`/app/database_volume/whatsapp_{instanceKey}.db`)
+- Media directory (`/app/media/{instanceKey}/`)
+- All associated media files
+
+### Connection Webhooks
+
+The system automatically sends webhooks for connection events:
+
+- `instance_connected` - When an instance successfully connects to WhatsApp
+- `instance_disconnected` - When an instance disconnects from WhatsApp
+- `instance_manually_connected` - When an instance is manually connected via API
+- `instance_manually_disconnected` - When an instance is manually disconnected via API
+- `instance_deleted` - When an instance is deleted via API
 
 ### Supported Area Codes
 
@@ -156,6 +201,11 @@ The system identifies and categorizes various WhatsApp events:
 - `disconnected` - Disconnected
 - `logged_out` - User logged out
 - `pair_success` - Device pairing successful
+- `instance_connected` - Instance successfully connected to WhatsApp
+- `instance_disconnected` - Instance disconnected from WhatsApp
+- `instance_manually_connected` - Instance manually connected via API
+- `instance_manually_disconnected` - Instance manually disconnected via API
+- `instance_deleted` - Instance deleted via API
 
 ## Environment Variables
 

@@ -224,6 +224,9 @@ func main() {
 	// Disconnect instance endpoint
 	r.POST("/instance/:instanceKey/disconnect", disconnectInstance)
 
+	// Delete instance endpoint
+	r.DELETE("/instance/:instanceKey", deleteInstance)
+
 	// Phone validation endpoint
 	r.POST("/phone/validate", validatePhone)
 	r.POST("/phone/test-exists", testPhoneExists)
@@ -689,6 +692,15 @@ func connectInstance(c *gin.Context) {
 			instance.PhoneNumber = instance.Client.Store.ID.User
 		}
 		
+		// Send manual connection webhook
+		connectionData := map[string]interface{}{
+			"instance_key": req.InstanceKey,
+			"phone_number": instance.PhoneNumber,
+			"status":       "manually_connected",
+			"timestamp":    time.Now(),
+		}
+		sendWebhook("instance_manually_connected", connectionData, req.InstanceKey)
+		
 		c.JSON(200, ConnectResponse{
 			Status:      "already_logged_in",
 			InstanceKey: req.InstanceKey,
@@ -825,10 +837,80 @@ func disconnectInstance(c *gin.Context) {
 	}
 	instance.IsConnected = false
 
+	// Send manual disconnection webhook
+	disconnectionData := map[string]interface{}{
+		"instance_key": instanceKey,
+		"phone_number": instance.PhoneNumber,
+		"status":       "manually_disconnected",
+		"timestamp":    time.Now(),
+	}
+	sendWebhook("instance_manually_disconnected", disconnectionData, instanceKey)
+
 	c.JSON(200, gin.H{
 		"status":       "disconnected",
 		"instance_key": instanceKey,
 		"message":      "Instance disconnected successfully",
+	})
+}
+
+// deleteInstance deletes a specific instance and all its associated data
+func deleteInstance(c *gin.Context) {
+	instanceKey := c.Param("instanceKey")
+
+	instanceManager.Mutex.RLock()
+	instance, exists := instanceManager.Instances[instanceKey]
+	instanceManager.Mutex.RUnlock()
+
+	if !exists {
+		c.JSON(404, gin.H{"error": "Instance not found"})
+		return
+	}
+
+	// Disconnect the client first if it's connected
+	instance.Mutex.Lock()
+	if instance.Client != nil {
+		instance.Client.Disconnect()
+	}
+	instance.IsConnected = false
+	instance.Mutex.Unlock()
+
+	// Note: Container will be garbage collected automatically
+	// No need to manually close the database connection
+
+	// Remove from instance manager
+	instanceManager.Mutex.Lock()
+	delete(instanceManager.Instances, instanceKey)
+	instanceManager.Mutex.Unlock()
+
+	// Delete database file
+	dbPath := fmt.Sprintf("/app/database_volume/whatsapp_%s.db", instanceKey)
+	if err := os.Remove(dbPath); err != nil {
+		log.Printf("Warning: Error deleting database file %s: %v", dbPath, err)
+	} else {
+		log.Printf("Deleted database file: %s", dbPath)
+	}
+
+	// Delete media directory for this instance
+	mediaDir := fmt.Sprintf("/app/media/%s", instanceKey)
+	if err := os.RemoveAll(mediaDir); err != nil {
+		log.Printf("Warning: Error deleting media directory %s: %v", mediaDir, err)
+	} else {
+		log.Printf("Deleted media directory: %s", mediaDir)
+	}
+
+	// Send deletion webhook
+	deletionData := map[string]interface{}{
+		"instance_key": instanceKey,
+		"phone_number": instance.PhoneNumber,
+		"status":       "deleted",
+		"timestamp":    time.Now(),
+	}
+	sendWebhook("instance_deleted", deletionData, instanceKey)
+
+	c.JSON(200, gin.H{
+		"status":       "deleted",
+		"instance_key": instanceKey,
+		"message":      "Instance and all associated data deleted successfully",
 	})
 }
 
@@ -1062,6 +1144,39 @@ func handleInstanceEvents(instanceKey string, evt interface{}) {
 		instance.Mutex.Unlock()
 		
 		log.Printf("Instance %s connected with phone number: %s", instanceKey, instance.PhoneNumber)
+		
+		// Send connection webhook
+		connectionData := map[string]interface{}{
+			"instance_key": instanceKey,
+			"phone_number": instance.PhoneNumber,
+			"status":       "connected",
+			"timestamp":    time.Now(),
+		}
+		sendWebhook("instance_connected", connectionData, instanceKey)
+	}
+	
+	// Handle disconnection events
+	if _, ok := evt.(*events.Disconnected); ok {
+		instanceManager.Mutex.RLock()
+		instance, exists := instanceManager.Instances[instanceKey]
+		instanceManager.Mutex.RUnlock()
+		
+		if exists {
+			instance.Mutex.Lock()
+			instance.IsConnected = false
+			instance.Mutex.Unlock()
+			
+			log.Printf("Instance %s disconnected", instanceKey)
+			
+			// Send disconnection webhook
+			disconnectionData := map[string]interface{}{
+				"instance_key": instanceKey,
+				"phone_number": instance.PhoneNumber,
+				"status":       "disconnected",
+				"timestamp":    time.Now(),
+			}
+			sendWebhook("instance_disconnected", disconnectionData, instanceKey)
+		}
 	}
 }
 
