@@ -47,10 +47,10 @@ graph TD
     Whatsmeow -- "Forwards events to" --> GoAPI
     GoAPI -- "Sends webhooks for events" --> WebhookReceiver
 
-    style GoAPI fill:#add8e6,stroke:#333,stroke-width:2px
-    style WebhookReceiver fill:#90ee90,stroke:#333,stroke-width:2px
-    style Postgres fill:#ffb6c1,stroke:#333,stroke-width:2px
-    style Client fill:#f0e68c,stroke:#333,stroke-width:2px
+    style GoAPI fill:#add8e6,stroke:#333,stroke-width:2px,color:#333
+    style WebhookReceiver fill:#90ee90,stroke:#333,stroke-width:2px,color:#333
+    style Postgres fill:#ffb6c1,stroke:#333,stroke-width:2px,color:#333
+    style Client fill:#f0e68c,stroke:#333,stroke-width:2px,color:#333
 ```
 
 ## Component Descriptions
