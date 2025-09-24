@@ -24,7 +24,7 @@ RUN go mod download
 COPY . .
 
 # Update go.mod and build the application
-RUN go mod tidy && CGO_ENABLED=1 go build -o main .
+RUN go mod tidy && CGO_ENABLED=1 go build -o main ./cmd/api
 
 # Create directories for database and media
 RUN mkdir -p /app/data && chmod 755 /app/data

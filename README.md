@@ -241,15 +241,88 @@ EASY_ZAP_WEBHOOK_URL=https://localhost:4444
 
 ## Docker Setup
 
-```bash
-# Build and start services
-docker-compose up -d
+To run the application, you need Docker and Docker Compose installed.
 
-# View logs
-docker-compose logs -f whatsapp-bridge
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/juliovianadev/multi-client-whatsapp.git
+    cd multi-client-whatsapp
+    ```
 
-# Access media files
-curl http://localhost:4444/media/{instance_key}/{date}/{filename}
+2.  **Create a `.env` file**:
+    ```bash
+    cp .env.example .env
+    ```
+    Update the environment variables in the `.env` file if needed.
+
+3.  **Build and start the services**:
+    ```bash
+    docker-compose up -d --build
+    ```
+
+4.  **View the logs**:
+    ```bash
+    docker-compose logs -f whatsapp-bridge
+    ```
+
+## Running Locally
+
+To run the application locally without Docker, you need Go installed.
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/juliovianadev/multi-client-whatsapp.git
+    cd multi-client-whatsapp
+    ```
+
+2.  **Create a `.env` file**:
+    ```bash
+    cp .env.example .env
+    ```
+    Update the environment variables in the `.env` file if needed. Make sure you have a running PostgreSQL instance and update the `DB_URL`.
+
+3.  **Install dependencies**:
+    ```bash
+    go mod tidy
+    ```
+
+4.  **Run the application**:
+    ```bash
+    go run cmd/api/main.go
+    ```
+
+The application will be running on `http://localhost:4444`.
+
+## Project Structure
+
+```
+.
+├── cmd/api/
+│   └── main.go
+├── internal/
+│   ├── instance/
+│   │   └── manager.go
+│   ├── platform/
+│   │   ├── database/
+│   │   │   └── database.go
+│   │   ├── router/
+│   │   │   └── router.go
+│   │   └── web/
+│   │       └── handlers/
+│   │           └── handlers.go
+│   ├── services/
+│   │   ├── phone.go
+│   │   ├── webhook.go
+│   │   └── whatsapp.go
+│   ├── types/
+│   │   └── types.go
+│   └── utils/
+│       └── utils.go
+├── .env.example
+├── docker-compose.yml
+├── go.mod
+├── go.sum
+└── README.md
 ```
 
 ## Volumes

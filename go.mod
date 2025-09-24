@@ -1,4 +1,4 @@
-module go-whats
+module multi-client-whatsapp
 
 go 1.24
 
