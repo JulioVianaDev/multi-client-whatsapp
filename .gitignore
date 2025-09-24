@@ -1,3 +1,5 @@
 /media/*
 /postgres_data/*
 !/postgres_data/.gitkeep
+/whatsapp_data/*
+!/whatsapp_data/.gitkeep
