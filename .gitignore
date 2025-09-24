@@ -1,4 +1,3 @@
 /media/*
-/database_volume/*.db
-/database_volume/*.db-shm
-/database_volume/*.db-wal
+/postgres_data/*
+!/postgres_data/.gitkeep

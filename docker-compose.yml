@@ -14,15 +14,17 @@ services:
       - whatsapp_data:/root/data
       # Media storage - bind mount for easy access on host
       - ./media:/app/media
-      # Database storage - bind mount for easy access on host
-      - ./database_volume:/app/database_volume
     environment:
       - TZ=UTC
       # Uncomment and modify the line below to set a custom webhook URL
       # - EASY_ZAP_WEBHOOK_URL=https://your-domain.com
+      - DB_DRIVER=postgres
+      - DB_URL=postgres://user:password@postgres:5432/postgres?sslmode=disable
     restart: unless-stopped
     networks:
       - whatsapp-network
+    depends_on:
+      - postgres
     # healthcheck:
     #   test:
     #     [
@@ -37,6 +39,21 @@ services:
     #   timeout: 10s
     #   retries: 3
     #   start_period: 40s
+
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
 
   # Node.js Webhook Receiver
   webhook-receiver:
@@ -71,6 +88,8 @@ services:
 
 volumes:
   whatsapp_data:
+    driver: local
+  postgres_data:
     driver: local
 
 networks:

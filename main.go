@@ -1,10 +1,10 @@
 package main
 
 import (
-	_ "github.com/mattn/go-sqlite3"
 	"bytes"
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,22 +12,26 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"github.com/lib/pq"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store/sqlstore"
-	waLog "go.mau.fi/whatsmeow/util/log"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
+	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -597,19 +601,49 @@ func validateAndCorrectPhone(phone string, instance *Instance) (string, error) {
 func createInstance(c *gin.Context) {
 	instanceKey := generateInstanceKey()
 
-	// Create database directory if it doesn't exist
-	dbDir := "/app/database_volume"
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		log.Printf("Error creating database directory: %v", err)
-		c.JSON(500, gin.H{"error": "Failed to create database directory"})
+	dbDriver := os.Getenv("DB_DRIVER")
+	dbURL := os.Getenv("DB_URL")
+
+	// Create a new database for this instance
+	dbName := "whatsapp_" + instanceKey
+	// The DB_URL should point to a maintenance database (e.g., "postgres")
+	db, err := sql.Open(dbDriver, dbURL)
+	if err != nil {
+		log.Printf("Error opening maintenance database: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to connect to database server"})
 		return
 	}
+	defer db.Close()
+
+	// Using fmt.Sprintf because CREATE DATABASE doesn't support parameterized queries for the db name.
+	// instanceKey is a hex string, so it's safe from SQL injection.
+	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, dbName))
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "42P04" { // 42P04 is duplicate_database
+			log.Printf("Database %s already exists, proceeding.", dbName)
+		} else {
+			log.Printf("Error creating database %s: %v", dbName, err)
+			c.JSON(500, gin.H{"error": "Failed to create instance database"})
+			return
+		}
+	} else {
+		log.Printf("Successfully created database %s", dbName)
+	}
+
+	// Construct the new DB URL for this instance
+	parsedURL, err := url.Parse(dbURL)
+	if err != nil {
+		log.Printf("Error parsing DB URL: %v", err)
+		c.JSON(500, gin.H{"error": "Invalid DB_URL"})
+		return
+	}
+	parsedURL.Path = "/" + dbName
+	instanceDbURL := parsedURL.String()
 
 	// Setup database for this instance
 	dbLog := waLog.Stdout(fmt.Sprintf("Database-%s", instanceKey), "DEBUG", true)
-	dbPath := fmt.Sprintf("%s/whatsapp_%s.db?_foreign_keys=on", dbDir, instanceKey)
-	
-	container, err := sqlstore.New(context.Background(), "sqlite3", dbPath, dbLog)
+
+	container, err := sqlstore.New(context.Background(), dbDriver, instanceDbURL, dbLog)
 	if err != nil {
 		log.Printf("Error creating database container for instance %s: %v", instanceKey, err)
 		c.JSON(500, gin.H{"error": "Failed to create database"})
@@ -871,23 +905,33 @@ func deleteInstance(c *gin.Context) {
 	if instance.Client != nil {
 		instance.Client.Disconnect()
 	}
+	if instance.Container != nil {
+		instance.Container.Close() // Close the database connection pool
+	}
 	instance.IsConnected = false
 	instance.Mutex.Unlock()
-
-	// Note: Container will be garbage collected automatically
-	// No need to manually close the database connection
 
 	// Remove from instance manager
 	instanceManager.Mutex.Lock()
 	delete(instanceManager.Instances, instanceKey)
 	instanceManager.Mutex.Unlock()
 
-	// Delete database file
-	dbPath := fmt.Sprintf("/app/database_volume/whatsapp_%s.db", instanceKey)
-	if err := os.Remove(dbPath); err != nil {
-		log.Printf("Warning: Error deleting database file %s: %v", dbPath, err)
+	// Now, drop the database
+	dbDriver := os.Getenv("DB_DRIVER")
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open(dbDriver, dbURL)
+	if err != nil {
+		log.Printf("Warning: Error opening maintenance database to drop instance db: %v", err)
 	} else {
-		log.Printf("Deleted database file: %s", dbPath)
+		defer db.Close()
+		dbName := "whatsapp_" + instanceKey
+		// Using fmt.Sprintf because DROP DATABASE doesn't support parameterized queries for the db name.
+		_, err = db.Exec(fmt.Sprintf(`DROP DATABASE "%s"`, dbName))
+		if err != nil {
+			log.Printf("Warning: Error dropping database %s: %v", dbName, err)
+		} else {
+			log.Printf("Successfully dropped database %s", dbName)
+		}
 	}
 
 	// Delete media directory for this instance

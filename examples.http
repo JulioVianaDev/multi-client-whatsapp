@@ -16,13 +16,13 @@ POST http://localhost:4444/instance/connect
 Content-Type: application/json
 
 {
-  "instance_key": "dba28e7a8c7380cb2a26ec629ff82684"
+  "instance_key": "7c2a8348d617ac6527856b5dc1f81cee"
 }
 
 ###
 
 ### 3. Get QR code for an instance (replace {instance_key})
-GET http://localhost:4444/instance/dba28e7a8c7380cb2a26ec629ff82684/qr
+GET http://localhost:4444/instance/7c2a8348d617ac6527856b5dc1f81cee/qr
 
 ###
 
@@ -56,7 +56,7 @@ POST http://localhost:4444/phone/validate
 Content-Type: application/json
 
 {
-  "instance_key": "fde807d3d684199733c5680ca63c867f",
+  "instance_key": "7c2a8348d617ac6527856b5dc1f81cee",
   "phone": "551288053918"
 }
 
@@ -137,8 +137,8 @@ POST http://localhost:4444/message/send
 Content-Type: application/json
 
 {
-  "instance_key": "fde807d3d684199733c5680ca63c867f",
-  "phone": "5541991968071",
+  "instance_key": "7c2a8348d617ac6527856b5dc1f81cee",
+  "phone": "551288053918",
   "message": "Teste com correção de número de atomatado! 🇧🇷",
   "reply_to": ""
 }
@@ -163,8 +163,8 @@ POST http://localhost:4444/message/send-media
 Content-Type: application/json
 
 {
-  "instance_key": "abc123def456",
-  "phone": "551288053918",
+  "instance_key": "7c2a8348d617ac6527856b5dc1f81cee",
+  "phone": "5512988053918",
   "url": "https://picsum.photos/400/300",
   "type": "image",
   "caption": "Check out this beautiful image! 📸"
